@@ -6,6 +6,7 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(express.static('public'));
 
 // Initialize Supabase Client using your environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
