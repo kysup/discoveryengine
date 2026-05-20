@@ -3,84 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discovery Engine Preview</title>
+    <title>Discovery Engine - Intake Workflow</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f7;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: #f5f5f7;
             margin: 0;
+            padding: 1rem;
         }
-        .card {
+        .container {
             background: white;
             padding: 2.5rem;
             border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            text-align: center;
-            max-width: 400px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            max-width: 480px;
             width: 100%;
         }
-        h1 { color: #1d1d1f; margin-bottom: 0.5rem; }
-        p { color: #86868b; margin-bottom: 1.5rem; }
-        .result-box {
-            background: #f5f5f7;
+        h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
+        p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
+        .action-zone {
+            background-color: #f5f5f7;
             padding: 1rem;
-            border-radius: 8px;
-            text-align: left;
-            margin-bottom: 1.5rem;
-            font-family: monospace;
-            min-height: 60px;
-            word-break: break-all;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
         }
-        button {
-            background-color: #0071e3;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 1rem;
-            border-radius: 980px;
-            cursor: pointer;
-            transition: background 0.2s;
+        .status-text { font-size: 0.85rem; color: #515154; font-weight: 500; }
+        button.trigger-btn {
+            background-color: #0071e3; color: white; border: none;
+            padding: 10px 20px; font-size: 0.9rem; font-weight: 500;
+            border-radius: 980px; cursor: pointer; transition: background 0.2s;
+            white-space: nowrap;
         }
-        button:hover { background-color: #0077ed; }
+        button.trigger-btn:hover { background-color: #0077ed; }
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
+        input, select {
+            width: 100%; padding: 12px; font-size: 0.95rem;
+            border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box;
+            background-color: #fff; color: #1d1d1f;
+        }
+        .populated-flash { animation: flashHighlight 1s ease-out; }
+        @keyframes flashHighlight {
+            0 { background-color: #e8f4ff; border-color: #0071e3; }
+            100% { background-color: #fff; border-color: #d2d2d7; }
+        }
+        .action-btn {
+            width: 100%; background-color: #1d1d1f; color: white; border: none;
+            padding: 14px; font-size: 1rem; font-weight: 500; border-radius: 8px;
+            margin-top: 1rem; cursor: pointer;
+        }
+        .action-btn:hover { background-color: #000; }
+        .action-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+        .pain-list { margin-top: 1.5rem; padding-left: 0; list-style: none; }
+        .pain-item {
+            background-color: #fff1f1; border-left: 4px solid #ff3b30;
+            padding: 12px; border-radius: 0 8px 8px 0; margin-bottom: 0.75rem;
+            font-size: 0.9rem; color: #1d1d1f;
+        }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1>Discovery Engine</h1>
-        <p>Generate a random enterprise identity</p>
+    <div class="container">
         
-        <div class="result-box" id="result">
-            Click generate to fetch from your live API...
+        <div id="step1" class="step-panel active">
+            <h1>Discovery Identity</h1>
+            <p class="subtitle">Step 1: Sync profile details and select operational focus.</p>
+            
+            <div class="action-zone">
+                <span class="status-text" id="statusLabel">Loading platform data...</span>
+                <button class="trigger-btn" id="popBtn" onclick="runAutoPopulate()" disabled>Auto-Populate</button>
+            </div>
+
+            <form onsubmit="submitLeadForm(event)">
+                <div class="form-group">
+                    <label for="firstName">First Name</label>
+                    <input type="text" id="firstName" required readonly>
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <input type="text" id="lastName" required readonly>
+                </div>
+                <div class="form-group">
+                    <label for="email">Enterprise Email</label>
+                    <input type="email" id="email" required readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="pillarSelect">Operational Pillar Focus</label>
+                    <select id="pillarSelect" required>
+                        <option value="" disabled selected>-- Loading pillars from DB... --</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="action-btn" id="submitBtn" disabled>Submit & Continue</button>
+            </form>
         </div>
 
-        <button onclick="generateIdentity()">Generate Identity</button>
+        <div id="step2" class="step-panel">
+            <h1>Targeted Friction Found</h1>
+            <p class="subtitle">Step 2: Review operational pain points tied to your selection.</p>
+            
+            <div id="painPointsContainer">
+                <label>Detected Pain Points:</label>
+                <ul class="pain-list" id="painList"></ul>
+            </div>
+
+            <button type="button" class="action-btn" onclick="resetToStepOne()" style="background-color: #86868b;">Create Another Record</button>
+        </div>
+
     </div>
 
     <script>
-        async function generateIdentity() {
-            const resultBox = document.getElementById('result');
-            resultBox.innerHTML = 'Fetching from database...';
-            
+        let currentRecord = null;
+        let createdLeadId = null;
+
+        // Automatically pull dynamic pillars from DB the moment page mounts
+        window.addEventListener('DOMContentLoaded', loadPillarsDropdown);
+
+        async function loadPillarsDropdown() {
+            const select = document.getElementById('pillarSelect');
+            const popBtn = document.getElementById('popBtn');
+            const statusLabel = document.getElementById('statusLabel');
+            try {
+                const response = await fetch('/api/pillars');
+                const data = await response.json();
+                
+                select.innerHTML = '<option value="" disabled selected>-- Choose an architectural pillar --</option>';
+                if (data.pillars) {
+                    data.pillars.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.innerText = p.name;
+                        select.appendChild(opt);
+                    });
+                }
+                statusLabel.innerText = 'Ready to parse profile.';
+                popBtn.disabled = false;
+            } catch (err) {
+                select.innerHTML = '<option value="" disabled>Failed to load database options</option>';
+                statusLabel.innerText = 'Database structural error.';
+            }
+        }
+
+        async function runAutoPopulate() {
+            const statusLabel = document.getElementById('statusLabel');
+            const submitBtn = document.getElementById('submitBtn');
+            const inputs = {
+                first: document.getElementById('firstName'),
+                last: document.getElementById('lastName'),
+                email: document.getElementById('email')
+            };
+
+            statusLabel.innerText = 'Pinging identity generator...';
+            statusLabel.style.color = '#0071e3';
+
             try {
                 const response = await fetch('/api/generate-identity');
                 const data = await response.json();
-                
+
                 if (data.error) {
-                    resultBox.innerHTML = `Error: ${data.error}`;
+                    statusLabel.innerText = `Error: ${data.error}`;
+                    statusLabel.style.color = '#ff3b30';
+                    return;
+                }
+
+                inputs.first.value = data.firstName || '';
+                inputs.last.value = data.lastName || '';
+                inputs.email.value = data.email || '';
+
+                currentRecord = {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    email: data.email
+                };
+
+                Object.values(inputs).forEach(input => {
+                    input.classList.remove('populated-flash');
+                    void input.offsetWidth; 
+                    input.classList.add('populated-flash');
+                });
+
+                statusLabel.innerText = 'Profile synced! Select a pillar.';
+                statusLabel.style.color = '#34c759';
+                submitBtn.disabled = false;
+
+            } catch (err) {
+                statusLabel.innerText = 'API connection error.';
+                statusLabel.style.color = '#ff3b30';
+            }
+        }
+
+        async function submitLeadForm(event) {
+            event.preventDefault();
+            const pillarSelect = document.getElementById('pillarSelect');
+            if (!currentRecord || !pillarSelect.value) return;
+
+            const statusLabel = document.getElementById('statusLabel');
+            const submitBtn = document.getElementById('submitBtn');
+
+            // Append selection to payload
+            currentRecord.pillarId = pillarSelect.value;
+
+            statusLabel.innerText = 'Writing record to Supabase...';
+            statusLabel.style.color = '#0071e3';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/submit-lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentRecord)
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    statusLabel.innerText = `Database Error: ${result.error}`;
+                    statusLabel.style.color = '#ff3b30';
+                    submitBtn.disabled = false;
                 } else {
-                    resultBox.innerHTML = `
-                        <strong>Name:</strong> ${data.firstName} ${data.lastName}<br>
-                        <strong>Corporate Email:</strong> ${data.email}
-                    `;
+                    createdLeadId = result.lead.id;
+                    
+                    // Immediately fetch pain points for the selected pillar ID
+                    await fetchPainPoints(pillarSelect.value);
+
+                    // Smooth panel swap
+                    document.getElementById('step1').classList.remove('active');
+                    document.getElementById('step2').classList.add('active');
                 }
             } catch (err) {
-                resultBox.innerHTML = 'Failed to connect to API.';
+                statusLabel.innerText = 'Failed to execute insert routing.';
+                statusLabel.style.color = '#ff3b30';
+                submitBtn.disabled = false;
             }
+        }
+
+        async function fetchPainPoints(pillarIdValue) {
+            const list = document.getElementById('painList');
+            list.innerHTML = '<li>Loading targeted pain points...</li>';
+
+            try {
+                const response = await fetch(`/api/pain-points?pillarId=${pillarIdValue}`);
+                const data = await response.json();
+
+                list.innerHTML = '';
+                if (data.painPoints && data.painPoints.length > 0) {
+                    data.painPoints.forEach(pain => {
+                        const li = document.createElement('li');
+                        li.className = 'pain-item';
+                        li.innerText = pain;
+                        list.appendChild(li);
+                    });
+                } else {
+                    list.innerHTML = '<li>No pain points mapped to this pillar yet.</li>';
+                }
+            } catch (err) {
+                list.innerHTML = '<li class="pain-item" style="border-color:#ff3b30;">Failed to load pain points.</li>';
+            }
+        }
+
+        function resetToStepOne() {
+            document.getElementById('statusLabel').innerText = 'Ready to parse data fields.';
+            document.getElementById('statusLabel').style.color = '#515154';
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('pillarSelect').selectedIndex = 0;
+            
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step1').classList.add('active');
+            currentRecord = null;
+            createdLeadId = null;
         }
     </script>
 </body>
