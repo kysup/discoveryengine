@@ -64,11 +64,42 @@
         .action-btn:disabled { cursor: not-allowed; opacity: 0.4; }
         .step-panel { display: none; }
         .step-panel.active { display: block; }
-        .pain-list { margin-top: 1.5rem; padding-left: 0; list-style: none; }
-        .pain-item {
-            background-color: #fff1f1; border-left: 4px solid #ff3b30;
-            padding: 12px; border-radius: 0 8px 8px 0; margin-bottom: 0.75rem;
-            font-size: 0.9rem; color: #1d1d1f;
+        
+        /* Checkbox list styles */
+        .checkbox-group-container {
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background-color: #fff;
+            border: 1px solid #d2d2d7;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            transition: background-color 0.15s ease;
+        }
+        .checkbox-row:hover {
+            background-color: #f5f5f7;
+        }
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .checkbox-row label {
+            margin: 0;
+            font-weight: 400;
+            font-size: 0.95rem;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1.3;
         }
     </style>
 </head>
@@ -100,6 +131,29 @@
                 </div>
                 
                 <div class="form-group">
+                    <label for="companyName">Company Name</label>
+                    <input type="text" id="companyName" required readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="companySize">Company Size</label>
+                    <select id="companySize">
+                        <option value="" selected>-- Select Size (Optional) --</option>
+                        <option value="1-10">1-10 employees</option>
+                        <option value="11-50">11-50 employees</option>
+                        <option value="51-200">51-200 employees</option>
+                        <option value="201-500">201-500 employees</option>
+                        <option value="501-1000">501-1,000 employees</option>
+                        <option value="1001+">1,001+ employees</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="industryId">Industry ID</label>
+                    <input type="number" id="industryId" placeholder="e.g., 4" min="1">
+                </div>
+                
+                <div class="form-group">
                     <label for="pillarSelect">Operational Pillar Focus</label>
                     <select id="pillarSelect" required>
                         <option value="" disabled selected>-- Loading pillars from DB... --</option>
@@ -112,14 +166,17 @@
 
         <div id="step2" class="step-panel">
             <h1>Targeted Friction Found</h1>
-            <p class="subtitle">Step 2: Review operational pain points tied to your selection.</p>
+            <p class="subtitle">Step 2: Select all operational pain points that apply to this profile.</p>
             
-            <div id="painPointsContainer">
-                <label>Detected Pain Points:</label>
-                <ul class="pain-list" id="painList"></ul>
-            </div>
+            <form id="painPointsForm" onsubmit="submitPainPointsForm(event)">
+                <div id="painPointsContainer">
+                    <label>Detected Pain Points:</label>
+                    <div id="painCheckboxes" class="checkbox-group-container"></div>
+                </div>
 
-            <button type="button" class="action-btn" onclick="resetToStepOne()" style="background-color: #86868b;">Create Another Record</button>
+                <button type="submit" class="action-btn" id="finalizeBtn">Finalize Lead Record</button>
+                <button type="button" class="action-btn" onclick="resetToStepOne()" style="background-color: #86868b; margin-top: 0.5rem;">Cancel & Start Over</button>
+            </form>
         </div>
 
     </div>
@@ -162,7 +219,8 @@
             const inputs = {
                 first: document.getElementById('firstName'),
                 last: document.getElementById('lastName'),
-                email: document.getElementById('email')
+                email: document.getElementById('email'),
+                company: document.getElementById('companyName')
             };
 
             statusLabel.innerText = 'Pinging identity generator...';
@@ -181,11 +239,13 @@
                 inputs.first.value = data.firstName || '';
                 inputs.last.value = data.lastName || '';
                 inputs.email.value = data.email || '';
+                inputs.company.value = data.companyName || '';
 
                 currentRecord = {
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    email: data.email
+                    email: data.email,
+                    companyName: data.companyName
                 };
 
                 Object.values(inputs).forEach(input => {
@@ -207,19 +267,78 @@
         async function submitLeadForm(event) {
             event.preventDefault();
             const pillarSelect = document.getElementById('pillarSelect');
+            const sizeSelect = document.getElementById('companySize');
+            const industryInput = document.getElementById('industryId');
+            
             if (!currentRecord || !pillarSelect.value) return;
 
-            const statusLabel = document.getElementById('statusLabel');
-            const submitBtn = document.getElementById('submitBtn');
+            // Gather manual input selections from Step 1 before pivoting
+            currentRecord.companySize = sizeSelect.value || null;
+            currentRecord.industryId = industryInput.value ? parseInt(industryInput.value) : null;
+            currentRecord.pillarId = parseInt(pillarSelect.value);
 
-            // Append selection to payload
-            currentRecord.pillarId = pillarSelect.value;
+            // Fetch matched items and build dynamic interactive checkbox array
+            await fetchPainPoints(currentRecord.pillarId);
 
-            statusLabel.innerText = 'Writing record to Supabase...';
-            statusLabel.style.color = '#0071e3';
-            submitBtn.disabled = true;
+            // Transition panels smoothly over to the multi-select interface
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+        }
+
+        async function fetchPainPoints(pillarIdValue) {
+            const container = document.getElementById('painCheckboxes');
+            container.innerHTML = '<p style="font-size:0.9rem; color:#86868b; margin:0;">Loading targeted pain points...</p>';
 
             try {
+                const response = await fetch(`/api/pain-points?pillarId=${pillarIdValue}`);
+                const data = await response.json();
+
+                container.innerHTML = '';
+                
+                if (data.painPoints && data.painPoints.length > 0) {
+                    data.painPoints.forEach(pain => {
+                        const row = document.createElement('div');
+                        row.className = 'checkbox-row';
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'painPointIds';
+                        checkbox.value = pain.id;
+                        checkbox.id = `pain_${pain.id}`;
+
+                        const label = document.createElement('label');
+                        label.htmlFor = `pain_${pain.id}`;
+                        label.innerText = pain.label;
+
+                        row.appendChild(checkbox);
+                        row.appendChild(label);
+                        container.appendChild(row);
+                    });
+                } else {
+                    container.innerHTML = '<p style="font-size:0.9rem; color:#86868b; margin:0;">No pain points mapped to this pillar yet.</p>';
+                }
+            } catch (err) {
+                container.innerHTML = '<p style="font-size:0.9rem; color:#ff3b30; margin:0;">Failed to load pain points.</p>';
+            }
+        }
+
+        async function submitPainPointsForm(event) {
+            event.preventDefault();
+            
+            const finalizeBtn = document.getElementById('finalizeBtn');
+            
+            // Gather all checked boxes from Step 2
+            const checkedBoxes = document.querySelectorAll('input[name="painPointIds"]:checked');
+            const selectedPainIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+
+            // Attach selections to our active data context
+            currentRecord.painPointIds = selectedPainIds;
+
+            finalizeBtn.disabled = true;
+            finalizeBtn.innerText = 'Writing complete record...';
+
+            try {
+                // Fire unified payload down to updated route
                 const response = await fetch('/api/submit-lead', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -229,58 +348,40 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    statusLabel.innerText = `Database Error: ${result.error}`;
-                    statusLabel.style.color = '#ff3b30';
-                    submitBtn.disabled = false;
+                    alert(`Database Error: ${result.error}`);
+                    finalizeBtn.disabled = false;
+                    finalizeBtn.innerText = 'Finalize Lead Record';
                 } else {
-                    createdLeadId = result.lead.id;
-                    
-                    // Immediately fetch pain points for the selected pillar ID
-                    await fetchPainPoints(pillarSelect.value);
-
-                    // Smooth panel swap
-                    document.getElementById('step1').classList.remove('active');
-                    document.getElementById('step2').classList.add('active');
+                    alert(`Success! Lead saved with ${selectedPainIds.length} flagged pain points.`);
+                    resetToStepOne();
                 }
             } catch (err) {
-                statusLabel.innerText = 'Failed to execute insert routing.';
-                statusLabel.style.color = '#ff3b30';
-                submitBtn.disabled = false;
-            }
-        }
-
-        async function fetchPainPoints(pillarIdValue) {
-            const list = document.getElementById('painList');
-            list.innerHTML = '<li>Loading targeted pain points...</li>';
-
-            try {
-                const response = await fetch(`/api/pain-points?pillarId=${pillarIdValue}`);
-                const data = await response.json();
-
-                list.innerHTML = '';
-                if (data.painPoints && data.painPoints.length > 0) {
-                    data.painPoints.forEach(pain => {
-                        const li = document.createElement('li');
-                        li.className = 'pain-item';
-                        li.innerText = pain;
-                        list.appendChild(li);
-                    });
-                } else {
-                    list.innerHTML = '<li>No pain points mapped to this pillar yet.</li>';
-                }
-            } catch (err) {
-                list.innerHTML = '<li class="pain-item" style="border-color:#ff3b30;">Failed to load pain points.</li>';
+                alert('Failed to execute database write sequence.');
+                finalizeBtn.disabled = false;
+                finalizeBtn.innerText = 'Finalize Lead Record';
             }
         }
 
         function resetToStepOne() {
-            document.getElementById('statusLabel').innerText = 'Ready to parse data fields.';
+            document.getElementById('statusLabel').innerText = 'Ready to parse profile.';
             document.getElementById('statusLabel').style.color = '#515154';
             document.getElementById('submitBtn').disabled = true;
             document.getElementById('pillarSelect').selectedIndex = 0;
+            document.getElementById('companySize').selectedIndex = 0;
+            
+            document.getElementById('firstName').value = '';
+            document.getElementById('lastName').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('companyName').value = '';
+            document.getElementById('industryId').value = '';
+            
+            const finalizeBtn = document.getElementById('finalizeBtn');
+            finalizeBtn.innerText = 'Finalize Lead Record';
+            finalizeBtn.disabled = false;
             
             document.getElementById('step2').classList.remove('active');
             document.getElementById('step1').classList.add('active');
+            
             currentRecord = null;
             createdLeadId = null;
         }
