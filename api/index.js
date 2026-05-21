@@ -10,8 +10,8 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// 1. HEALTH CHECK: Verify database state immediately on load and return explicit diagnostics
-app.get('/api/health', async (req, res) => {
+// 1. HEALTH CHECK: Handles both Vercel serverless formats
+app.get(['/api/health', '/health'], async (req, res) => {
     try {
         if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
             return res.status(500).json({ 
@@ -19,28 +19,21 @@ app.get('/api/health', async (req, res) => {
                 reason: 'Missing credentials. Check Vercel environment variables configuration.' 
             });
         }
-        
-        // Ping a basic schema look up to check link viability
         const { error } = await supabase.from('pillars').select('id').limit(1);
-        
         if (error) {
             return res.status(500).json({ 
                 status: 'disconnected', 
-                reason: `Supabase returned a structural error: ${error.message}. Your database project might be paused, deleted, or tables have changed.` 
+                reason: `Supabase structural error: ${error.message}` 
             });
         }
-
         return res.json({ status: 'connected' });
     } catch (err) {
-        return res.status(500).json({ 
-            status: 'disconnected', 
-            reason: `System runtime connection exception: ${err.message}` 
-        });
+        return res.status(500).json({ status: 'disconnected', reason: err.message });
     }
 });
 
-// 2. GET: Generate random identity (Unified Last Name, Company, and Clean Email structure)
-app.get('/api/generate-identity', async (req, res) => {
+// 2. GET: Generate identity
+app.get(['/api/generate-identity', '/generate-identity'], async (req, res) => {
     try {
         const { data: firstNames, error: e1 } = await supabase.from('random_first_names').select('name');
         const { data: lastNames, error: e2 } = await supabase.from('random_last_names').select('name');
@@ -50,12 +43,10 @@ app.get('/api/generate-identity', async (req, res) => {
         const first = firstNames[Math.floor(Math.random() * firstNames.length)].name;
         const last = lastNames[Math.floor(Math.random() * lastNames.length)].name;
 
-        // Unified corporate identity using the exact same last name
         const suffixes = ['Solutions', 'Tech', 'Holdings', 'Logistics', 'Networks', '& Co.'];
         const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
         const companyName = `${last} ${randomSuffix}`;
 
-        // Sanitize the company name to create a clean email domain
         const sanitizedDomain = companyName
             .toLowerCase()
             .replace(/&/g, '')
@@ -70,8 +61,8 @@ app.get('/api/generate-identity', async (req, res) => {
     }
 });
 
-// 3. GET: Fetch pillars (Core Focus) to populate Step 1 dropdown on page load
-app.get('/api/pillars', async (req, res) => {
+// 3. GET: Fetch pillars (Core Focus)
+app.get(['/api/pillars', '/pillars'], async (req, res) => {
     try {
         const { data, error } = await supabase.from('pillars').select('id, name');
         if (error) throw error;
@@ -81,8 +72,8 @@ app.get('/api/pillars', async (req, res) => {
     }
 });
 
-// 4. GET: Fetch industries to populate Step 1 dropdown on page load
-app.get('/api/industries', async (req, res) => {
+// 4. GET: Fetch industries
+app.get(['/api/industries', '/industries'], async (req, res) => {
     try {
         const { data, error } = await supabase.from('industries').select('id, name');
         if (error) throw error;
@@ -92,8 +83,8 @@ app.get('/api/industries', async (req, res) => {
     }
 });
 
-// 5. POST: Submit Lead mapping data directly to your ordered schema layout
-app.post('/api/submit-lead', async (req, res) => {
+// 5. POST: Submit Lead data
+app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
     try {
         const { 
             firstName, 
@@ -106,12 +97,10 @@ app.post('/api/submit-lead', async (req, res) => {
             painPointIds 
         } = req.body;
 
-        // Strict field validation rules
         if (!firstName || !lastName || !email || !companyName || !companySize || !pillarId) {
             return res.status(400).json({ error: 'Missing required profile fields.' });
         }
 
-        // Phase A: Insert into 'leads' following your exact ordered database columns
         const { data: leadData, error: leadError } = await supabase
             .from('leads')
             .insert([
@@ -129,10 +118,8 @@ app.post('/api/submit-lead', async (req, res) => {
             .select();
 
         if (leadError) throw leadError;
-        
         const newLead = leadData[0];
 
-        // Phase B: Map checked items down into the relational 'lead_answers' junction table
         if (painPointIds && painPointIds.length > 0) {
             const answerRows = painPointIds.map(painId => ({
                 lead_id: newLead.id,
@@ -153,7 +140,7 @@ app.post('/api/submit-lead', async (req, res) => {
 });
 
 // 6. GET: Fetch pain points filtering directly by the selected pillar_id
-app.get('/api/pain-points', async (req, res) => {
+app.get(['/api/pain-points', '/pain-points'], async (req, res) => {
     try {
         const { pillarId } = req.query;
         if (!pillarId) return res.status(400).json({ error: 'Missing pillarId parameter.' });
@@ -170,8 +157,4 @@ app.get('/api/pain-points', async (req, res) => {
     }
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Discovery Engine server listening on port ${PORT}`);
-});
+export default app;
