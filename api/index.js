@@ -10,32 +10,30 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// 1. GET: Generate random identity (With unified Last Name, Company, and Email structure)
+// 1. GET: Generate random identity (Unified Last Name, Company, and Clean Email structure)
 app.get('/api/generate-identity', async (req, res) => {
     try {
-        // Fetch raw pool data from name tables
         const { data: firstNames, error: e1 } = await supabase.from('random_first_names').select('name');
         const { data: lastNames, error: e2 } = await supabase.from('random_last_names').select('name');
         
         if (e1 || e2) throw new Error('Failed to fetch random names from database tables.');
 
-        // Select the core names randomly
         const first = firstNames[Math.floor(Math.random() * firstNames.length)].name;
         const last = lastNames[Math.floor(Math.random() * lastNames.length)].name;
 
-        // Use the EXACT same last name to generate the company name
+        // Unified corporate identity using the exact same last name
         const suffixes = ['Solutions', 'Tech', 'Holdings', 'Logistics', 'Networks', '& Co.'];
         const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
         const companyName = `${last} ${randomSuffix}`;
 
-        // Sanitize the company name to create the email domain
+        // Sanitize the company name to create a clean email domain
         const sanitizedDomain = companyName
             .toLowerCase()
             .replace(/&/g, '')
             .replace(/\./g, '')
             .replace(/\s+/g, '');
         
-        // Formulated precisely as: lowercase_firstname@sanitizeddomain.com
+        // Structure: lowercase_firstname@sanitizeddomain.com
         const email = `${first.toLowerCase()}@${sanitizedDomain}.com`;
 
         return res.json({ 
@@ -49,7 +47,7 @@ app.get('/api/generate-identity', async (req, res) => {
     }
 });
 
-// 2. GET: Fetch pillars to populate Step 1 dropdown on page load
+// 2. GET: Fetch pillars (Core Focus) to populate Step 1 dropdown on page load
 app.get('/api/pillars', async (req, res) => {
     try {
         const { data, error } = await supabase.from('pillars').select('id, name');
@@ -60,7 +58,18 @@ app.get('/api/pillars', async (req, res) => {
     }
 });
 
-// 3. POST: Submit Lead mapping data directly to the new ordered schema layout
+// 3. GET: Fetch industries to populate Step 1 dropdown on page load
+app.get('/api/industries', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('industries').select('id, name');
+        if (error) throw error;
+        return res.json({ industries: data });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. POST: Submit Lead mapping data directly to your new ordered schema layout
 app.post('/api/submit-lead', async (req, res) => {
     try {
         const { 
@@ -74,12 +83,12 @@ app.post('/api/submit-lead', async (req, res) => {
             painPointIds 
         } = req.body;
 
-        // Validation rule check
+        // Validation check for core required assets
         if (!firstName || !lastName || !email || !companyName || !pillarId) {
             return res.status(400).json({ error: 'Missing required profile fields.' });
         }
 
-        // Phase A: Insert into 'leads' following your exact column-sequence pattern
+        // Phase A: Insert into 'leads' following your exact ordered database columns
         const { data: leadData, error: leadError } = await supabase
             .from('leads')
             .insert([
@@ -100,7 +109,7 @@ app.post('/api/submit-lead', async (req, res) => {
         
         const newLead = leadData[0];
 
-        // Phase B: Write selection items down to junction 'lead_answers' record matrix
+        // Phase B: Map checked items down into the relational 'lead_answers' junction table
         if (painPointIds && painPointIds.length > 0) {
             const answerRows = painPointIds.map(painId => ({
                 lead_id: newLead.id,
@@ -120,7 +129,7 @@ app.post('/api/submit-lead', async (req, res) => {
     }
 });
 
-// 4. GET: Fetch pain points filtering directly by the selected pillar_id
+// 5. GET: Fetch pain points filtering directly by the selected pillar_id
 app.get('/api/pain-points', async (req, res) => {
     try {
         const { pillarId } = req.query;
@@ -142,7 +151,7 @@ app.get('/api/pain-points', async (req, res) => {
     }
 });
 
-// Start application runtime listening services
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Discovery Engine server listening on port ${PORT}`);

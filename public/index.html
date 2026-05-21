@@ -109,7 +109,7 @@
         
         <div id="step1" class="step-panel active">
             <h1>Discovery Identity</h1>
-            <p class="subtitle">Step 1: Sync profile details and select operational focus.</p>
+            <p class="subtitle">Step 1: Sync profile details and select structural tracks.</p>
             
             <div class="action-zone">
                 <span class="status-text" id="statusLabel">Loading platform data...</span>
@@ -139,24 +139,23 @@
                     <label for="companySize">Company Size</label>
                     <select id="companySize">
                         <option value="" selected>-- Select Size (Optional) --</option>
-                        <option value="1-10">1-10 employees</option>
-                        <option value="11-50">11-50 employees</option>
-                        <option value="51-200">51-200 employees</option>
-                        <option value="201-500">201-500 employees</option>
-                        <option value="501-1000">501-1,000 employees</option>
-                        <option value="1001+">1,001+ employees</option>
+                        <option value="Small">Small</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Enterprise">Enterprise</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="industryId">Industry ID</label>
-                    <input type="number" id="industryId" placeholder="e.g., 4" min="1">
+                    <label for="industrySelect">Industry</label>
+                    <select id="industrySelect">
+                        <option value="" selected>-- Loading industry options... --</option>
+                    </select>
                 </div>
                 
                 <div class="form-group">
-                    <label for="pillarSelect">Operational Pillar Focus</label>
+                    <label for="pillarSelect">Core Focus</label>
                     <select id="pillarSelect" required>
-                        <option value="" disabled selected>-- Loading pillars from DB... --</option>
+                        <option value="" disabled selected>-- Loading options from DB... --</option>
                     </select>
                 </div>
                 
@@ -185,31 +184,70 @@
         let currentRecord = null;
         let createdLeadId = null;
 
-        // Automatically pull dynamic pillars from DB the moment page mounts
-        window.addEventListener('DOMContentLoaded', loadPillarsDropdown);
+        // Initialize drop choices concurrently on load
+        window.addEventListener('DOMContentLoaded', loadFormDropdowns);
 
-        async function loadPillarsDropdown() {
-            const select = document.getElementById('pillarSelect');
+        async function loadFormDropdowns() {
+            const pillarSelect = document.getElementById('pillarSelect');
+            const industrySelect = document.getElementById('industrySelect');
             const popBtn = document.getElementById('popBtn');
             const statusLabel = document.getElementById('statusLabel');
+
+            let pillarsLoaded = false;
+            let industriesLoaded = false;
+
+            // 1. Fetch Core Focus Pillars
             try {
-                const response = await fetch('/api/pillars');
-                const data = await response.json();
+                const pillarsRes = await fetch('/api/pillars');
+                const pillarsData = await pillarsRes.json();
                 
-                select.innerHTML = '<option value="" disabled selected>-- Choose an architectural pillar --</option>';
-                if (data.pillars) {
-                    data.pillars.forEach(p => {
+                if (pillarsData.pillars && !pillarsData.error) {
+                    pillarSelect.innerHTML = '<option value="" disabled selected>-- Choose a focus area --</option>';
+                    pillarsData.pillars.forEach(p => {
                         const opt = document.createElement('option');
                         opt.value = p.id;
                         opt.innerText = p.name;
-                        select.appendChild(opt);
+                        pillarSelect.appendChild(opt);
                     });
+                    pillarsLoaded = true;
+                } else {
+                    throw new Error();
                 }
-                statusLabel.innerText = 'Ready to parse profile.';
-                popBtn.disabled = false;
             } catch (err) {
-                select.innerHTML = '<option value="" disabled>Failed to load database options</option>';
-                statusLabel.innerText = 'Database structural error.';
+                pillarSelect.innerHTML = '<option value="" disabled selected>(Issue loading focus areas, please reload page)</option>';
+            }
+
+            // 2. Fetch Industries
+            try {
+                const industriesRes = await fetch('/api/industries');
+                const industriesData = await industriesRes.json();
+                
+                if (industriesData.industries && !industriesData.error) {
+                    industrySelect.innerHTML = '<option value="">-- Select Industry (Optional) --</option>';
+                    industriesData.industries.forEach(i => {
+                        const opt = document.createElement('option');
+                        opt.value = i.id;
+                        opt.innerText = i.name;
+                        industrySelect.appendChild(opt);
+                    });
+                    industriesLoaded = true;
+                } else {
+                    throw new Error();
+                }
+            } catch (err) {
+                industrySelect.innerHTML = '<option value="" selected>(Issue loading industries, please reload page)</option>';
+            }
+
+            // Resolve systemic app tracking readiness indicators
+            if (pillarsLoaded && industriesLoaded) {
+                statusLabel.innerText = 'Ready to parse profile.';
+                statusLabel.style.color = '#515154';
+                popBtn.disabled = false;
+            } else {
+                statusLabel.innerText = 'Database connection error.';
+                statusLabel.style.color = '#ff3b30';
+                // Leave button unlocked in case they want to attempt parsing profiles regardless
+                popBtn.disabled = false;
             }
         }
 
@@ -254,7 +292,7 @@
                     input.classList.add('populated-flash');
                 });
 
-                statusLabel.innerText = 'Profile synced! Select a pillar.';
+                statusLabel.innerText = 'Profile synced! Select options.';
                 statusLabel.style.color = '#34c759';
                 submitBtn.disabled = false;
 
@@ -268,19 +306,16 @@
             event.preventDefault();
             const pillarSelect = document.getElementById('pillarSelect');
             const sizeSelect = document.getElementById('companySize');
-            const industryInput = document.getElementById('industryId');
+            const industrySelect = document.getElementById('industrySelect');
             
             if (!currentRecord || !pillarSelect.value) return;
 
-            // Gather manual input selections from Step 1 before pivoting
             currentRecord.companySize = sizeSelect.value || null;
-            currentRecord.industryId = industryInput.value ? parseInt(industryInput.value) : null;
+            currentRecord.industryId = industrySelect.value ? parseInt(industrySelect.value) : null;
             currentRecord.pillarId = parseInt(pillarSelect.value);
 
-            // Fetch matched items and build dynamic interactive checkbox array
             await fetchPainPoints(currentRecord.pillarId);
 
-            // Transition panels smoothly over to the multi-select interface
             document.getElementById('step1').classList.remove('active');
             document.getElementById('step2').classList.add('active');
         }
@@ -324,21 +359,17 @@
 
         async function submitPainPointsForm(event) {
             event.preventDefault();
-            
             const finalizeBtn = document.getElementById('finalizeBtn');
             
-            // Gather all checked boxes from Step 2
             const checkedBoxes = document.querySelectorAll('input[name="painPointIds"]:checked');
             const selectedPainIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
 
-            // Attach selections to our active data context
             currentRecord.painPointIds = selectedPainIds;
 
             finalizeBtn.disabled = true;
             finalizeBtn.innerText = 'Writing complete record...';
 
             try {
-                // Fire unified payload down to updated route
                 const response = await fetch('/api/submit-lead', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -366,14 +397,16 @@
             document.getElementById('statusLabel').innerText = 'Ready to parse profile.';
             document.getElementById('statusLabel').style.color = '#515154';
             document.getElementById('submitBtn').disabled = true;
-            document.getElementById('pillarSelect').selectedIndex = 0;
+            
+            // Re-trigger global database asset check to cleanly clear broken states
+            loadFormDropdowns();
+            
             document.getElementById('companySize').selectedIndex = 0;
             
             document.getElementById('firstName').value = '';
             document.getElementById('lastName').value = '';
             document.getElementById('email').value = '';
             document.getElementById('companyName').value = '';
-            document.getElementById('industryId').value = '';
             
             const finalizeBtn = document.getElementById('finalizeBtn');
             finalizeBtn.innerText = 'Finalize Lead Record';
