@@ -10,13 +10,42 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// 1. GET: Generate random identity (Unified Last Name, Company, and Clean Email structure)
+// 1. HEALTH CHECK: Verify database state immediately on load and return explicit diagnostics
+app.get('/api/health', async (req, res) => {
+    try {
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return res.status(500).json({ 
+                status: 'disconnected', 
+                reason: 'Missing credentials. Check Vercel environment variables configuration.' 
+            });
+        }
+        
+        // Ping a basic schema look up to check link viability
+        const { error } = await supabase.from('pillars').select('id').limit(1);
+        
+        if (error) {
+            return res.status(500).json({ 
+                status: 'disconnected', 
+                reason: `Supabase returned a structural error: ${error.message}. Your database project might be paused, deleted, or tables have changed.` 
+            });
+        }
+
+        return res.json({ status: 'connected' });
+    } catch (err) {
+        return res.status(500).json({ 
+            status: 'disconnected', 
+            reason: `System runtime connection exception: ${err.message}` 
+        });
+    }
+});
+
+// 2. GET: Generate random identity (Unified Last Name, Company, and Clean Email structure)
 app.get('/api/generate-identity', async (req, res) => {
     try {
         const { data: firstNames, error: e1 } = await supabase.from('random_first_names').select('name');
         const { data: lastNames, error: e2 } = await supabase.from('random_last_names').select('name');
         
-        if (e1 || e2) throw new Error('Failed to fetch random names from database tables.');
+        if (e1 || e2) throw new Error('Could not pull random names from generation seed tables.');
 
         const first = firstNames[Math.floor(Math.random() * firstNames.length)].name;
         const last = lastNames[Math.floor(Math.random() * lastNames.length)].name;
@@ -33,21 +62,15 @@ app.get('/api/generate-identity', async (req, res) => {
             .replace(/\./g, '')
             .replace(/\s+/g, '');
         
-        // Structure: lowercase_firstname@sanitizeddomain.com
         const email = `${first.toLowerCase()}@${sanitizedDomain}.com`;
 
-        return res.json({ 
-            firstName: first, 
-            lastName: last, 
-            email,
-            companyName 
-        });
+        return res.json({ firstName: first, lastName: last, email, companyName });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 });
 
-// 2. GET: Fetch pillars (Core Focus) to populate Step 1 dropdown on page load
+// 3. GET: Fetch pillars (Core Focus) to populate Step 1 dropdown on page load
 app.get('/api/pillars', async (req, res) => {
     try {
         const { data, error } = await supabase.from('pillars').select('id, name');
@@ -58,7 +81,7 @@ app.get('/api/pillars', async (req, res) => {
     }
 });
 
-// 3. GET: Fetch industries to populate Step 1 dropdown on page load
+// 4. GET: Fetch industries to populate Step 1 dropdown on page load
 app.get('/api/industries', async (req, res) => {
     try {
         const { data, error } = await supabase.from('industries').select('id, name');
@@ -69,7 +92,7 @@ app.get('/api/industries', async (req, res) => {
     }
 });
 
-// 4. POST: Submit Lead mapping data directly to your new ordered schema layout
+// 5. POST: Submit Lead mapping data directly to your ordered schema layout
 app.post('/api/submit-lead', async (req, res) => {
     try {
         const { 
@@ -83,8 +106,8 @@ app.post('/api/submit-lead', async (req, res) => {
             painPointIds 
         } = req.body;
 
-        // Validation check for core required assets
-        if (!firstName || !lastName || !email || !companyName || !pillarId) {
+        // Strict field validation rules
+        if (!firstName || !lastName || !email || !companyName || !companySize || !pillarId) {
             return res.status(400).json({ error: 'Missing required profile fields.' });
         }
 
@@ -97,7 +120,7 @@ app.post('/api/submit-lead', async (req, res) => {
                     last_name: lastName, 
                     email: email,
                     company_name: companyName,
-                    company_size: companySize || null,
+                    company_size: companySize,
                     industry_id: industryId ? parseInt(industryId) : null,
                     pillar_id: parseInt(pillarId),
                     completed_step: 2
@@ -129,14 +152,11 @@ app.post('/api/submit-lead', async (req, res) => {
     }
 });
 
-// 5. GET: Fetch pain points filtering directly by the selected pillar_id
+// 6. GET: Fetch pain points filtering directly by the selected pillar_id
 app.get('/api/pain-points', async (req, res) => {
     try {
         const { pillarId } = req.query;
-        
-        if (!pillarId) {
-            return res.status(400).json({ error: 'Missing pillarId parameter.' });
-        }
+        if (!pillarId) return res.status(400).json({ error: 'Missing pillarId parameter.' });
 
         const { data, error } = await supabase
             .from('pain_points')
@@ -144,7 +164,6 @@ app.get('/api/pain-points', async (req, res) => {
             .eq('pillar_id', parseInt(pillarId));
 
         if (error) throw error;
-
         return res.json({ painPoints: data });
     } catch (err) {
         return res.status(500).json({ error: err.message });
