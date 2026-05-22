@@ -8,382 +8,131 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f5f5f7;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 1rem;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; padding: 1rem;
         }
         .container {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 16px;
+            background: white; padding: 2.5rem; border-radius: 16px;
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-            max-width: 480px;
-            width: 100%;
+            max-width: 480px; width: 100%;
         }
         h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
         p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
         
-        /* Tightened and centered layout style rules over the form fields */
-        .action-zone {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            width: 100%;
-        }
+        .action-zone { display: flex; justify-content: center; margin-bottom: 1.5rem; width: 100%; }
         button.trigger-btn {
             background-color: #0071e3; color: white; border: none;
             width: 100%; padding: 14px; font-size: 1rem; font-weight: 500;
             border-radius: 8px; cursor: pointer; transition: background 0.2s;
         }
         button.trigger-btn:hover { background-color: #0077ed; }
-        button.trigger-btn:disabled { background-color: #d2d2d7; cursor: not-allowed; color: #86868b; }
         
         .form-group { margin-bottom: 1.25rem; }
         label { display: block; font-size: 0.85rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
         input, select {
             width: 100%; padding: 12px; font-size: 0.95rem;
             border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box;
-            background-color: #fff; color: #1d1d1f;
-        }
-        .populated-flash { animation: flashHighlight 1s ease-out; }
-        @keyframes flashHighlight {
-            0 { background-color: #e8f4ff; border-color: #0071e3; }
-            100% { background-color: #fff; border-color: #d2d2d7; }
         }
         .action-btn {
             width: 100%; background-color: #1d1d1f; color: white; border: none;
             padding: 14px; font-size: 1rem; font-weight: 500; border-radius: 8px;
             margin-top: 1rem; cursor: pointer;
         }
-        .action-btn:hover { background-color: #000; }
-        .action-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+        .action-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        
         .step-panel { display: none; }
         .step-panel.active { display: block; }
-        
-        .checkbox-group-container {
-            margin-top: 1rem;
-            margin-bottom: 1.5rem;
-            max-height: 280px;
-            overflow-y: auto;
+
+        /* Spinner Styles */
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid #0071e3;
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite; margin: 20px auto;
         }
-        .checkbox-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background-color: #fff;
-            border: 1px solid #d2d2d7;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 0.75rem;
-            transition: background-color 0.15s ease;
-        }
-        .checkbox-row:hover { background-color: #f5f5f7; }
-        .checkbox-row input[type="checkbox"] {
-            width: 18px; height: 18px; cursor: pointer; margin: 0; flex-shrink: 0;
-        }
-        .checkbox-row label {
-            margin: 0; font-weight: 400; font-size: 0.95rem; cursor: pointer; user-select: none; line-height: 1.3;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        
+    <div class="container" id="mainContainer">
         <div id="step1" class="step-panel active">
-            <h1>Discovery Identity</h1>
-            <p class="subtitle">Step 1: Sync profile details and select structural tracks.</p>
-            
-            <div class="action-zone">
-                <button class="trigger-btn" id="popBtn" onclick="runAutoPopulate()" disabled>Auto-Populate Form</button>
-            </div>
-
+            <h1>Software Discovery Engine</h1>
+            <p class="subtitle">Fill out form to get recommendations!</p>
+            <button class="trigger-btn" id="popBtn" onclick="runAutoPopulate()">Auto-Populate</button>
             <form onsubmit="submitLeadForm(event)">
-                <div class="form-group">
-                    <label for="firstName">First Name</label>
-                    <input type="text" id="firstName" required readonly>
-                </div>
-                <div class="form-group">
-                    <label for="lastName">Last Name</label>
-                    <input type="text" id="lastName" required readonly>
-                </div>
-                <div class="form-group">
-                    <label for="email">Enterprise Email</label>
-                    <input type="email" id="email" required readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="companyName">Company Name</label>
-                    <input type="text" id="companyName" required readonly>
-                </div>
-
-                <div class="form-group">
-                    <label for="companySize">Company Size</label>
-                    <select id="companySize" required>
-                        <option value="" disabled selected>-- Select Size --</option>
-                        <option value="Small">Small</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Enterprise">Enterprise</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="industrySelect">Industry</label>
-                    <select id="industrySelect">
-                        <option value="" selected>-- Loading industry options... --</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="pillarSelect">Core Focus</label>
-                    <select id="pillarSelect" required>
-                        <option value="" disabled selected>-- Loading options from DB... --</option>
-                    </select>
-                </div>
-                
-                <button type="submit" class="action-btn" id="submitBtn" disabled>Submit & Continue</button>
+                <div class="form-group"><label>First Name</label><input type="text" id="firstName" required readonly></div>
+                <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required readonly></div>
+                <div class="form-group"><label>Email</label><input type="email" id="email" required readonly></div>
+                <div class="form-group"><label>Company</label><input type="text" id="companyName" required readonly></div>
+                <div class="form-group"><label>Size</label><select id="companySize" required><option value="Small">Small</option><option value="Medium">Medium</option><option value="Enterprise">Enterprise</option></select></div>
+                <div class="form-group"><label>Industry</label><select id="industrySelect" required><option value="">-- Select --</option></select></div>
+                <div class="form-group"><label>Department</label><select id="pillarSelect" required><option value="">-- Select --</option></select></div>
+                <button type="submit" class="action-btn" id="submitBtn">Submit & Continue</button>
             </form>
         </div>
 
         <div id="step2" class="step-panel">
-            <h1>Targeted Friction Found</h1>
-            <p class="subtitle">Step 2: Select all operational pain points that apply to this profile.</p>
-            
+            <h1>Targeted Friction</h1>
+            <p class="subtitle">Select your pain points:</p>
             <form id="painPointsForm" onsubmit="submitPainPointsForm(event)">
-                <div id="painPointsContainer">
-                    <label>Detected Pain Points:</label>
-                    <div id="painCheckboxes" class="checkbox-group-container"></div>
-                </div>
-
+                <div id="painCheckboxes"></div>
                 <button type="submit" class="action-btn" id="finalizeBtn">Finalize Lead Record</button>
-                <button type="button" class="action-btn" onclick="resetToStepOne()" style="background-color: #86868b; margin-top: 0.5rem;">Cancel & Start Over</button>
             </form>
         </div>
-
     </div>
 
     <script>
         let currentRecord = null;
-        let createdLeadId = null;
 
-        // Perform systemic integrity health checks immediately when document mounts
-        window.addEventListener('DOMContentLoaded', runSystemDiagnostics);
-
-        async function runSystemDiagnostics() {
-            const popBtn = document.getElementById('popBtn');
-            const pillarSelect = document.getElementById('pillarSelect');
-            const industrySelect = document.getElementById('industrySelect');
-
-            console.log("🔍 Discovery Engine: Launching database connection diagnostics...");
-
-            try {
-                // Ping the backend health diagnostic engine first
-                const healthRes = await fetch('/api/health');
-                const healthData = await healthRes.json();
-
-                if (healthData.status !== 'connected') {
-                    console.error("❌ DISCOVERY ENGINE DATABASE CONNECTION ERROR:\n", healthData.reason);
-                    pillarSelect.innerHTML = '<option value="" disabled selected>(Issue loading focus areas, please reload page)</option>';
-                    industrySelect.innerHTML = '<option value="" selected>(Issue loading industries, please reload page)</option>';
-                    return;
-                }
-
-                console.log("✅ Discovery Engine: Connected to Supabase infrastructure successfully.");
-
-                // Concurrent lookup data retrieval execution
-                const [pillarsRes, industriesRes] = await Promise.all([
-                    fetch('/api/pillars'),
-                    fetch('/api/industries')
-                ]);
-
-                const pillarsData = await pillarsRes.json();
-                const industriesData = await industriesRes.json();
-
-                // Build Pillar Choices
-                pillarSelect.innerHTML = '<option value="" disabled selected>-- Choose a focus area --</option>';
-                if (pillarsData.pillars) {
-                    pillarsData.pillars.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.id; opt.innerText = p.name;
-                        pillarSelect.appendChild(opt);
-                    });
-                }
-
-                // Build Industry Choices
-                industrySelect.innerHTML = '<option value="">-- Select Industry (Optional) --</option>';
-                if (industriesData.industries) {
-                    industriesData.industries.forEach(i => {
-                        const opt = document.createElement('option');
-                        opt.value = i.id; opt.innerText = i.name;
-                        industrySelect.appendChild(opt);
-                    });
-                }
-
-                // Unlock generation core engine triggers
-                popBtn.disabled = false;
-
-            } catch (err) {
-                console.error("❌ SYSTEM NETWORK CRITICAL FAULT:", err.message);
-                pillarSelect.innerHTML = '<option value="" disabled selected>(Issue loading focus areas, please reload page)</option>';
-                industrySelect.innerHTML = '<option value="" selected>(Issue loading industries, please reload page)</option>';
-            }
-        }
-
-        async function runAutoPopulate() {
-            const submitBtn = document.getElementById('submitBtn');
-            const inputs = {
-                first: document.getElementById('firstName'),
-                last: document.getElementById('lastName'),
-                email: document.getElementById('email'),
-                company: document.getElementById('companyName')
-            };
-
-            try {
-                const response = await fetch('/api/generate-identity');
-                const data = await response.json();
-
-                if (data.error) {
-                    console.error("❌ Identity Generation Route Error:", data.error);
-                    return;
-                }
-
-                inputs.first.value = data.firstName || '';
-                inputs.last.value = data.lastName || '';
-                inputs.email.value = data.email || '';
-                inputs.company.value = data.companyName || '';
-
-                currentRecord = {
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    email: data.email,
-                    companyName: data.companyName
-                };
-
-                Object.values(inputs).forEach(input => {
-                    input.classList.remove('populated-flash');
-                    void input.offsetWidth; 
-                    input.classList.add('populated-flash');
-                });
-
-                submitBtn.disabled = false;
-
-            } catch (err) {
-                console.error("❌ UI Connection Interface Exception:", err.message);
-            }
-        }
-
-        async function submitLeadForm(event) {
-            event.preventDefault();
-            const pillarSelect = document.getElementById('pillarSelect');
-            const sizeSelect = document.getElementById('companySize');
-            const industrySelect = document.getElementById('industrySelect');
-            
-            if (!currentRecord || !pillarSelect.value) return;
-
-            currentRecord.companySize = sizeSelect.value;
-            currentRecord.industryId = industrySelect.value ? parseInt(industrySelect.value) : null;
-            currentRecord.pillarId = parseInt(pillarSelect.value);
-
-            await fetchPainPoints(currentRecord.pillarId);
-
-            document.getElementById('step1').classList.remove('active');
-            document.getElementById('step2').classList.add('active');
-        }
-
-        async function fetchPainPoints(pillarIdValue) {
-            const container = document.getElementById('painCheckboxes');
-            container.innerHTML = '<p style="font-size:0.9rem; color:#86868b; margin:0;">Loading targeted pain points...</p>';
-
-            try {
-                const response = await fetch(`/api/pain-points?pillarId=${pillarIdValue}`);
-                const data = await response.json();
-                container.innerHTML = '';
-                
-                if (data.painPoints && data.painPoints.length > 0) {
-                    data.painPoints.forEach(pain => {
-                        const row = document.createElement('div');
-                        row.className = 'checkbox-row';
-
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox'; checkbox.name = 'painPointIds';
-                        checkbox.value = pain.id; checkbox.id = `pain_${pain.id}`;
-
-                        const label = document.createElement('label');
-                        label.htmlFor = `pain_${pain.id}`; label.innerText = pain.label;
-
-                        row.appendChild(checkbox); row.appendChild(label);
-                        container.appendChild(row);
-                    });
-                } else {
-                    container.innerHTML = '<p style="font-size:0.9rem; color:#86868b; margin:0;">No pain points mapped to this pillar yet.</p>';
-                }
-            } catch (err) {
-                console.error("❌ Checkbox layout query execution failed:", err.message);
-                container.innerHTML = '<p style="font-size:0.9rem; color:#ff3b30; margin:0;">Failed to load pain points.</p>';
-            }
-        }
-
+        // --- CORE SUBMISSION LOGIC WITH LOADER ---
         async function submitPainPointsForm(event) {
             event.preventDefault();
-            const finalizeBtn = document.getElementById('finalizeBtn');
-            
+            const container = document.getElementById('mainContainer');
             const checkedBoxes = document.querySelectorAll('input[name="painPointIds"]:checked');
             const selectedPainIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
 
-            currentRecord.painPointIds = selectedPainIds;
-            finalizeBtn.disabled = true;
-            finalizeBtn.innerText = 'Writing complete record...';
+            // Show Loading State
+            container.innerHTML = `
+                <h1>Analyzing Matches...</h1>
+                <div class="loader"></div>
+                <p style="text-align:center; color:#86868b;">Calculating the perfect software pyramid for your business.</p>
+            `;
 
             try {
                 const response = await fetch('/api/submit-lead', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(currentRecord)
+                    body: JSON.stringify({ ...currentRecord, painPointIds: selectedPainIds })
                 });
 
                 const result = await response.json();
-
-                if (result.error) {
-                    console.error("❌ Backend submission write execution failed:", result.error);
-                    alert(`Database Error: ${result.error}`);
-                    finalizeBtn.disabled = false;
-                    finalizeBtn.innerText = 'Finalize Lead Record';
+                if (result.recommendations) {
+                    renderRecommendations(result.recommendations);
                 } else {
-                    alert(`Success! Lead saved with ${selectedPainIds.length} flagged pain points.`);
-                    resetToStepOne();
+                    throw new Error("No recommendations returned.");
                 }
             } catch (err) {
-                console.error("❌ Form transaction handling exception:", err.message);
-                alert('Failed to execute database write sequence.');
-                finalizeBtn.disabled = false;
-                finalizeBtn.innerText = 'Finalize Lead Record';
+                alert('Error: ' + err.message);
+                location.reload();
             }
         }
 
-        function resetToStepOne() {
-            document.getElementById('submitBtn').disabled = true;
-            document.getElementById('companySize').selectedIndex = 0;
+        // --- PYRAMID RENDERER ---
+        function renderRecommendations(recommendations) {
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center;"></div><button class="action-btn" onclick="location.reload()">Start Over</button>`;
             
-            document.getElementById('firstName').value = '';
-            document.getElementById('lastName').value = '';
-            document.getElementById('email').value = '';
-            document.getElementById('companyName').value = '';
-            
-            const finalizeBtn = document.getElementById('finalizeBtn');
-            finalizeBtn.innerText = 'Finalize Lead Record';
-            finalizeBtn.disabled = false;
-            
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step1').classList.add('active');
-            
-            currentRecord = null;
-            createdLeadId = null;
-
-            runSystemDiagnostics();
+            const pyramid = document.getElementById('pyramidContainer');
+            recommendations.forEach((sol, index) => {
+                const width = 100 - (index * 15);
+                const card = document.createElement('div');
+                card.style.cssText = `width:${width}%; background:#f5f5f7; padding:20px; border-radius:12px; text-align:center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);`;
+                card.innerHTML = `<h3 style="margin:0;">${sol.solution_name}</h3><p style="font-size:0.8rem;">Score: ${sol.totalScore}</p>`;
+                pyramid.appendChild(card);
+            });
         }
+
+        // ... (Keep your existing runSystemDiagnostics and other helper functions here) ...
     </script>
 </body>
 </html>

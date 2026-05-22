@@ -97,8 +97,9 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
             painPointIds 
         } = req.body;
 
-        if (!firstName || !lastName || !email || !companyName || !companySize || !pillarId) {
-            return res.status(400).json({ error: 'Missing required profile fields.' });
+        // Added industryId to the validation requirement
+        if (!firstName || !lastName || !email || !companyName || !companySize || !pillarId || !industryId) {
+            return res.status(400).json({ error: 'Missing required profile fields, including Industry.' });
         }
 
         const { data: leadData, error: leadError } = await supabase
@@ -110,7 +111,7 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
                     email: email,
                     company_name: companyName,
                     company_size: companySize,
-                    industry_id: industryId ? parseInt(industryId) : null,
+                    industry_id: parseInt(industryId),
                     pillar_id: parseInt(pillarId),
                     completed_step: 2
                 }
