@@ -19,15 +19,15 @@
         h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
         p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
         
-        .action-zone { display: flex; justify-content: center; margin-bottom: 1.5rem; width: 100%; }
+        .action-zone { display: flex; justify-content: center; margin-bottom: 2rem; width: 100%; }
         button.trigger-btn {
             background-color: #0071e3; color: white; border: none;
             width: 100%; padding: 14px; font-size: 1rem; font-weight: 500;
             border-radius: 8px; cursor: pointer; transition: background 0.2s;
         }
-        button.trigger-btn:hover { background-color: #0077ed; }
         
         .form-group { margin-bottom: 1.25rem; }
+        form { margin-top: 2rem; }
         label { display: block; font-size: 0.85rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
         input, select {
             width: 100%; padding: 12px; font-size: 0.95rem;
@@ -38,12 +38,10 @@
             padding: 14px; font-size: 1rem; font-weight: 500; border-radius: 8px;
             margin-top: 1rem; cursor: pointer;
         }
-        .action-btn:disabled { cursor: not-allowed; opacity: 0.6; }
         
         .step-panel { display: none; }
         .step-panel.active { display: block; }
 
-        /* Spinner Styles */
         .loader {
             border: 4px solid #f3f3f3; border-top: 4px solid #0071e3;
             border-radius: 50%; width: 30px; height: 30px;
@@ -58,16 +56,18 @@
         <div id="step1" class="step-panel active">
             <h1>Software Discovery Engine</h1>
             <p class="subtitle">Fill out form to get recommendations!</p>
-            <button class="trigger-btn" id="popBtn" onclick="runAutoPopulate()">Auto-Populate</button>
+            <div class="action-zone">
+                <button class="trigger-btn" id="popBtn" onclick="runAutoPopulate()" disabled>Auto-Populate</button>
+            </div>
             <form onsubmit="submitLeadForm(event)">
                 <div class="form-group"><label>First Name</label><input type="text" id="firstName" required readonly></div>
                 <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required readonly></div>
                 <div class="form-group"><label>Email</label><input type="email" id="email" required readonly></div>
                 <div class="form-group"><label>Company</label><input type="text" id="companyName" required readonly></div>
                 <div class="form-group"><label>Size</label><select id="companySize" required><option value="Small">Small</option><option value="Medium">Medium</option><option value="Enterprise">Enterprise</option></select></div>
-                <div class="form-group"><label>Industry</label><select id="industrySelect" required><option value="">-- Select --</option></select></div>
-                <div class="form-group"><label>Department</label><select id="pillarSelect" required><option value="">-- Select --</option></select></div>
-                <button type="submit" class="action-btn" id="submitBtn">Submit & Continue</button>
+                <div class="form-group"><label>Industry</label><select id="industrySelect" required><option value="">-- Loading... --</option></select></div>
+                <div class="form-group"><label>Department</label><select id="pillarSelect" required><option value="">-- Loading... --</option></select></div>
+                <button type="submit" class="action-btn" id="submitBtn" disabled>Submit & Continue</button>
             </form>
         </div>
 
@@ -83,56 +83,83 @@
 
     <script>
         let currentRecord = null;
+        window.addEventListener('DOMContentLoaded', runSystemDiagnostics);
 
-        // --- CORE SUBMISSION LOGIC WITH LOADER ---
+        async function runSystemDiagnostics() {
+            const [pillarsRes, industriesRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
+            const pData = await pillarsRes.json();
+            const iData = await industriesRes.json();
+            
+            const pSelect = document.getElementById('pillarSelect');
+            const iSelect = document.getElementById('industrySelect');
+            
+            pSelect.innerHTML = '<option value="">-- Select Department --</option>';
+            pData.pillars.forEach(p => pSelect.innerHTML += `<option value="${p.id}">${p.name}</option>`);
+            
+            iSelect.innerHTML = '<option value="">-- Select Industry --</option>';
+            iData.industries.forEach(i => iSelect.innerHTML += `<option value="${i.id}">${i.name}</option>`);
+            
+            document.getElementById('popBtn').disabled = false;
+        }
+
+        async function runAutoPopulate() {
+            const res = await fetch('/api/generate-identity');
+            const data = await res.json();
+            currentRecord = data;
+            document.getElementById('firstName').value = data.firstName;
+            document.getElementById('lastName').value = data.lastName;
+            document.getElementById('email').value = data.email;
+            document.getElementById('companyName').value = data.companyName;
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        async function submitLeadForm(event) {
+            event.preventDefault();
+            currentRecord.companySize = document.getElementById('companySize').value;
+            currentRecord.industryId = document.getElementById('industrySelect').value;
+            currentRecord.pillarId = document.getElementById('pillarSelect').value;
+            
+            const res = await fetch(`/api/pain-points?pillarId=${currentRecord.pillarId}`);
+            const data = await res.json();
+            const container = document.getElementById('painCheckboxes');
+            container.innerHTML = data.painPoints.map(p => `
+                <div style="margin-bottom:10px;">
+                    <input type="checkbox" name="painPointIds" value="${p.id}" id="p${p.id}">
+                    <label for="p${p.id}">${p.label}</label>
+                </div>
+            `).join('');
+            
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+        }
+
         async function submitPainPointsForm(event) {
             event.preventDefault();
             const container = document.getElementById('mainContainer');
-            const checkedBoxes = document.querySelectorAll('input[name="painPointIds"]:checked');
-            const selectedPainIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+            container.innerHTML = `<h1>Analyzing Matches...</h1><div class="loader"></div>`;
 
-            // Show Loading State
-            container.innerHTML = `
-                <h1>Analyzing Matches...</h1>
-                <div class="loader"></div>
-                <p style="text-align:center; color:#86868b;">Calculating the perfect software pyramid for your business.</p>
-            `;
-
-            try {
-                const response = await fetch('/api/submit-lead', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...currentRecord, painPointIds: selectedPainIds })
-                });
-
-                const result = await response.json();
-                if (result.recommendations) {
-                    renderRecommendations(result.recommendations);
-                } else {
-                    throw new Error("No recommendations returned.");
-                }
-            } catch (err) {
-                alert('Error: ' + err.message);
-                location.reload();
-            }
+            const selected = Array.from(document.querySelectorAll('input[name="painPointIds"]:checked')).map(cb => cb.value);
+            const res = await fetch('/api/submit-lead', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...currentRecord, painPointIds: selected })
+            });
+            const result = await res.json();
+            renderRecommendations(result.recommendations);
         }
 
-        // --- PYRAMID RENDERER ---
         function renderRecommendations(recommendations) {
             const container = document.getElementById('mainContainer');
-            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center;"></div><button class="action-btn" onclick="location.reload()">Start Over</button>`;
+            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; margin-top:20px;"></div><button class="action-btn" onclick="location.reload()">Start Over</button>`;
             
-            const pyramid = document.getElementById('pyramidContainer');
             recommendations.forEach((sol, index) => {
                 const width = 100 - (index * 15);
                 const card = document.createElement('div');
-                card.style.cssText = `width:${width}%; background:#f5f5f7; padding:20px; border-radius:12px; text-align:center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);`;
+                card.style.cssText = `width:${width}%; background:#f5f5f7; padding:20px; border-radius:12px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.1); word-wrap:break-word; overflow:hidden;`;
                 card.innerHTML = `<h3 style="margin:0;">${sol.solution_name}</h3><p style="font-size:0.8rem;">Score: ${sol.totalScore}</p>`;
-                pyramid.appendChild(card);
+                document.getElementById('pyramidContainer').appendChild(card);
             });
         }
-
-        // ... (Keep your existing runSystemDiagnostics and other helper functions here) ...
     </script>
 </body>
 </html>
