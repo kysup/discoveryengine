@@ -10,19 +10,19 @@
         h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
         p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
         
-        /* Pill Styling */
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
+        input, select { width: 100%; padding: 12px; font-size: 0.95rem; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; }
+        
         .pill-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 2rem; }
-        .pill { 
-            padding: 10px 16px; border-radius: 20px; border: 1px solid #d2d2d7; 
-            cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none;
-        }
+        .pill { padding: 10px 16px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; }
         .pill.active { background-color: #34c759; border-color: #34c759; color: white; }
         
-        .action-btn { width: 100%; background-color: #1d1d1f; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; }
+        .action-btn { width: 100%; background-color: #1d1d1f; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 1rem; }
+        #popBtn { width: 100%; padding: 12px; background: #0071e3; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 2rem; }
+        
         .step-panel { display: none; }
         .step-panel.active { display: block; }
-        /* Add specific margin to fix your button spacing issue */
-        #popBtn { margin-bottom: 2rem; width: 100%; padding: 12px; background: #0071e3; color: white; border: none; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -33,7 +33,14 @@
             <p class="subtitle">Fill out form to get recommendations!</p>
             <button id="popBtn" onclick="runAutoPopulate()">Randomize Form</button>
             <form onsubmit="submitLeadForm(event)">
-                <button type="submit" class="action-btn" id="submitBtn" disabled>Submit & Continue</button>
+                <div class="form-group"><label>First Name</label><input type="text" id="firstName" required></div>
+                <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required></div>
+                <div class="form-group"><label>Email</label><input type="email" id="email" required></div>
+                <div class="form-group"><label>Company</label><input type="text" id="companyName" required></div>
+                <div class="form-group"><label>Size</label><select id="companySize" required><option value="Small">Small</option><option value="Medium">Medium</option><option value="Enterprise">Enterprise</option></select></div>
+                <div class="form-group"><label>Industry</label><select id="industrySelect" required><option value="">-- Select Industry --</option></select></div>
+                <div class="form-group"><label>Department</label><select id="pillarSelect" required><option value="">-- Select Department --</option></select></div>
+                <button type="submit" class="action-btn" id="submitBtn">Submit & Continue</button>
             </form>
         </div>
 
@@ -49,27 +56,38 @@
         let currentRecord = null;
         let selectedPillIds = new Set();
 
+        window.onload = async () => {
+            const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
+            const pData = await pRes.json();
+            const iData = await iRes.json();
+            pData.pillars.forEach(p => document.getElementById('pillarSelect').innerHTML += `<option value="${p.id}">${p.name}</option>`);
+            iData.industries.forEach(i => document.getElementById('industrySelect').innerHTML += `<option value="${i.id}">${i.name}</option>`);
+        };
+
         async function runAutoPopulate() {
-            // Update button text logic
-            const btn = document.getElementById('popBtn');
-            btn.innerText = "Re-Randomize";
-            
+            document.getElementById('popBtn').innerText = "Re-Randomize";
             const res = await fetch('/api/generate-identity');
-            const data = await res.json();
-            currentRecord = data;
-            // ... fill inputs ...
+            currentRecord = await res.json();
+            document.getElementById('firstName').value = currentRecord.firstName;
+            document.getElementById('lastName').value = currentRecord.lastName;
+            document.getElementById('email').value = currentRecord.email;
+            document.getElementById('companyName').value = currentRecord.companyName;
         }
 
         async function submitLeadForm(event) {
             event.preventDefault();
-            // ... capture fields ...
+            currentRecord = { 
+                ...currentRecord,
+                companySize: document.getElementById('companySize').value,
+                industryId: document.getElementById('industrySelect').value,
+                pillarId: document.getElementById('pillarSelect').value
+            };
+            
             const res = await fetch(`/api/pain-points?pillarId=${currentRecord.pillarId}`);
             const data = await res.json();
-            
-            const container = document.getElementById('painPills');
-            container.innerHTML = data.painPoints.map(p => `
-                <div class="pill" onclick="togglePill(this, ${p.id})">${p.label}</div>
-            `).join('');
+            document.getElementById('painPills').innerHTML = data.painPoints.map(p => 
+                `<div class="pill" onclick="togglePill(this, ${p.id})">${p.label}</div>`
+            ).join('');
             
             document.getElementById('step1').style.display = 'none';
             document.getElementById('step2').style.display = 'block';
@@ -77,24 +95,27 @@
 
         function togglePill(el, id) {
             el.classList.toggle('active');
-            if (selectedPillIds.has(id)) selectedPillIds.delete(id);
-            else selectedPillIds.add(id);
+            selectedPillIds.has(id) ? selectedPillIds.delete(id) : selectedPillIds.add(id);
         }
 
         async function submitPainPointsForm() {
-            const container = document.getElementById('mainContainer');
-            container.innerHTML = `<h1>Analyzing Matches...</h1>`; // + loader
-
+            document.getElementById('mainContainer').innerHTML = '<h1>Analyzing Matches...</h1>';
             const res = await fetch('/api/submit-lead', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...currentRecord, painPointIds: Array.from(selectedPillIds) })
             });
             const result = await res.json();
-            renderRecommendations(result.recommendations);
+            
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center;"></div>`;
+            result.recommendations.forEach((sol, i) => {
+                const card = document.createElement('div');
+                card.style.cssText = `width:${100-(i*15)}%; background:#f5f5f7; padding:20px; border-radius:12px; text-align:center; word-wrap:break-word;`;
+                card.innerHTML = `<h3>${sol.solution_name}</h3>`;
+                document.getElementById('pyramidContainer').appendChild(card);
+            });
         }
-        
-        // ... (Keep renderRecommendations as defined before) ...
     </script>
 </body>
 </html>
