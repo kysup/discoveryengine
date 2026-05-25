@@ -83,7 +83,7 @@ app.get(['/api/industries', '/industries'], async (req, res) => {
     }
 });
 
-// 5. POST: Submit Lead data
+// 5. POST: Submit Lead data & Return Top 3 Ranked Recommendations
 app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
     try {
         const { 
@@ -94,14 +94,14 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
             companySize, 
             industryId, 
             pillarId, 
-            painPointIds 
+            intentionIds 
         } = req.body;
 
-        // Added industryId to the validation requirement
         if (!firstName || !lastName || !email || !companyName || !companySize || !pillarId || !industryId) {
             return res.status(400).json({ error: 'Missing required profile fields, including Industry.' });
         }
 
+        // Insert new lead into the database
         const { data: leadData, error: leadError } = await supabase
             .from('leads')
             .insert([
@@ -121,10 +121,11 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
         if (leadError) throw leadError;
         const newLead = leadData[0];
 
-        if (painPointIds && painPointIds.length > 0) {
-            const answerRows = painPointIds.map(painId => ({
+        // Save selected intentions to lead_answers table
+        if (intentionIds && intentionIds.length > 0) {
+            const answerRows = intentionIds.map(intentId => ({
                 lead_id: newLead.id,
-                pain_point_id: painId
+                intention_id: parseInt(intentId)
             }));
 
             const { error: answersError } = await supabase
@@ -134,25 +135,105 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
             if (answersError) throw answersError;
         }
 
-        return res.status(201).json({ success: true, leadId: newLead.id });
+        // RECOMMENDATION ENGINE LOGIC:
+        // Step A: Find all products permitted by the Lead's selected industry
+        const { data: industryProducts, error: indError } = await supabase
+            .from('product_industries')
+            .select('product_id')
+            .eq('industry_id', parseInt(industryId));
+
+        if (indError) throw indError;
+        const targetProductIds = industryProducts.map(p => p.product_id);
+
+        if (targetProductIds.length === 0 || !intentionIds || intentionIds.length === 0) {
+            return res.status(201).json({ success: true, leadId: newLead.id, recommendations: [] });
+        }
+
+        // Step B: Grab scores, justifications, and parent metadata for the valid products matching selected intentions
+        const { data: scoringData, error: scoringError } = await supabase
+            .from('product_intentions')
+            .select(`
+                product_id,
+                score,
+                justification,
+                products (
+                    id,
+                    company_name,
+                    product_name,
+                    product_url,
+                    logo_url
+                )
+            `)
+            .in('intention_id', intentionIds.map(id => parseInt(id)))
+            .in('product_id', targetProductIds);
+
+        if (scoringError) throw scoringError;
+
+        // Step C: Aggregate and compute cumulative scores per product in JavaScript
+        const scoreTracker = {};
+        scoringData.forEach(row => {
+            if (!row.products) return;
+            const pId = row.product_id;
+            
+            if (!scoreTracker[pId]) {
+                scoreTracker[pId] = {
+                    product_id: pId,
+                    product_name: row.products.product_name,
+                    company_name: row.products.company_name,
+                    product_url: row.products.product_url,
+                    logo_url: row.products.logo_url,
+                    total_score: 0,
+                    justifications: []
+                };
+            }
+            scoreTracker[pId].total_score += (row.score || 0);
+            if (row.justification) {
+                scoreTracker[pId].justifications.push(row.justification);
+            }
+        });
+
+        // Step D: Sort down descending by score and slice off the top 3
+        const topRecommendations = Object.values(scoreTracker)
+            .sort((a, b) => b.total_score - a.total_score)
+            .slice(0, 3);
+
+        return res.status(201).json({ 
+            success: true, 
+            leadId: newLead.id, 
+            recommendations: topRecommendations 
+        });
+
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 });
 
-// 6. GET: Fetch pain points filtering directly by the selected pillar_id
-app.get(['/api/pain-points', '/pain-points'], async (req, res) => {
+// 6. GET: Fetch intentions filtering directly by the selected pillar_id via the junction table
+app.get(['/api/intentions', '/intentions'], async (req, res) => {
     try {
         const { pillarId } = req.query;
         if (!pillarId) return res.status(400).json({ error: 'Missing pillarId parameter.' });
 
         const { data, error } = await supabase
-            .from('pain_points')
-            .select('id, label')
+            .from('intention_pillars')
+            .select(`
+                intention_id,
+                intentions (
+                    id,
+                    label,
+                    type
+                )
+            `)
             .eq('pillar_id', parseInt(pillarId));
 
         if (error) throw error;
-        return res.json({ painPoints: data });
+
+        // Extract and flatten the internal object definitions mapped out by relational query
+        const matchingIntentions = data
+            .filter(item => item.intentions !== null)
+            .map(item => item.intentions);
+
+        return res.json({ intentions: matchingIntentions });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

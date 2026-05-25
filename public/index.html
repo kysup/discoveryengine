@@ -45,16 +45,16 @@
         </div>
 
         <div id="step2" class="step-panel">
-            <h1>Friction / Pain Points</h1>
+            <h1>Company Initiatives or Pain Points</h1>
             <p class="subtitle">Select multiple options below:</p>
             <div id="painPills" class="pill-container"></div>
-            <button class="action-btn" onclick="submitPainPointsForm()">Finalize & View Results</button>
+            <button class="action-btn" onclick="submitPainPointsForm()">Submit & View Recommendations</button>
         </div>
     </div>
 
     <script>
         let currentRecord = null;
-        let selectedPillIds = new Set();
+        let selectedIntentionIds = new Set();
 
         window.onload = async () => {
             const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
@@ -65,7 +65,7 @@
         };
 
         async function runAutoPopulate() {
-            document.getElementById('popBtn').innerText = "Re-Randomize";
+            document.getElementById('popBtn').innerText = "Randomize Again";
             const res = await fetch('/api/generate-identity');
             currentRecord = await res.json();
             document.getElementById('firstName').value = currentRecord.firstName;
@@ -83,10 +83,10 @@
                 pillarId: document.getElementById('pillarSelect').value
             };
             
-            const res = await fetch(`/api/pain-points?pillarId=${currentRecord.pillarId}`);
+            const res = await fetch(`/api/intentions?pillarId=${currentRecord.pillarId}`);
             const data = await res.json();
-            document.getElementById('painPills').innerHTML = data.painPoints.map(p => 
-                `<div class="pill" onclick="togglePill(this, ${p.id})">${p.label}</div>`
+            document.getElementById('painPills').innerHTML = data.intentions.map(i => 
+                `<div class="pill" onclick="togglePill(this, ${i.id})">${i.label}</div>`
             ).join('');
             
             document.getElementById('step1').style.display = 'none';
@@ -95,7 +95,7 @@
 
         function togglePill(el, id) {
             el.classList.toggle('active');
-            selectedPillIds.has(id) ? selectedPillIds.delete(id) : selectedPillIds.add(id);
+            selectedIntentionIds.has(id) ? selectedIntentionIds.delete(id) : selectedIntentionIds.add(id);
         }
 
         async function submitPainPointsForm() {
@@ -103,16 +103,34 @@
             const res = await fetch('/api/submit-lead', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...currentRecord, painPointIds: Array.from(selectedPillIds) })
+                body: JSON.stringify({ ...currentRecord, intentionIds: Array.from(selectedIntentionIds) })
             });
             const result = await res.json();
             
             const container = document.getElementById('mainContainer');
-            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center;"></div>`;
-            result.recommendations.forEach((sol, i) => {
+            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
+            
+            if (!result.recommendations || result.recommendations.length === 0) {
+                document.getElementById('pyramidContainer').innerHTML = `<p style="color:#86868b;">No matching tools found for your configurations.</p>`;
+                return;
+            }
+
+            result.recommendations.forEach((prod, i) => {
                 const card = document.createElement('div');
-                card.style.cssText = `width:${100-(i*15)}%; background:#f5f5f7; padding:20px; border-radius:12px; text-align:center; word-wrap:break-word;`;
-                card.innerHTML = `<h3>${sol.solution_name}</h3>`;
+                card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:20px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
+                
+                // Construct logo element cleanly if logo_url is stored in database record
+                let logoImg = '';
+                if (prod.logo_url) {
+                    logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: 45px; max-width: 140px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
+                }
+
+                card.innerHTML = `
+                    ${logoImg}
+                    <h3 style="margin: 0; color: #1d1d1f; font-size: 1.15rem;">${prod.product_name}</h3>
+                    <span style="font-size: 0.8rem; color: #86868b; font-weight: 500;">by ${prod.company_name}</span>
+                    <span style="display: inline-block; background: #e8e8ed; color: #1d1d1f; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; margin-top: 4px;">Score: ${prod.total_score}</span>
+                `;
                 document.getElementById('pyramidContainer').appendChild(card);
             });
         }
