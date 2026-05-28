@@ -6,20 +6,28 @@
     <title>Discovery Engine</title>
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #f5f5f7; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; }
-        .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); max-width: 480px; width: 100%; }
+        .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); max-width: 600px; width: 100%; }
         h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
+        h3 { margin: 0; }
         p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
         
         .form-group { margin-bottom: 1.25rem; }
         label { display: block; font-size: 0.85rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
         input, select { width: 100%; padding: 12px; font-size: 0.95rem; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; }
+        input:focus { outline: none; border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1); }
         
-        .pill-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 2rem; }
-        .pill { padding: 10px 16px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; }
+        .pill-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
+        .pill { padding: 10px 16px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; background: white; color: #1d1d1f; }
+        .pill:hover { border-color: #0071e3; background-color: #f0f6ff; }
         .pill.active { background-color: #34c759; border-color: #34c759; color: white; }
+        .pill.active:hover { background-color: #30b24f; }
         
-        .action-btn { width: 100%; background-color: #1d1d1f; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 1rem; }
-        #popBtn { width: 100%; padding: 12px; background: #0071e3; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 2rem; }
+        .pill-score { font-size: 0.7rem; opacity: 0.7; display: block; margin-top: 2px; }
+        
+        .action-btn { width: 100%; background-color: #1d1d1f; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 1rem; font-weight: 600; transition: background 0.2s; }
+        .action-btn:hover { background-color: #424245; }
+        #popBtn { width: 100%; padding: 12px; background: #0071e3; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 2rem; font-weight: 600; transition: background 0.2s; }
+        #popBtn:hover { background-color: #0066d6; }
         
         .step-panel { display: none; }
         .step-panel.active { display: block; }
@@ -46,15 +54,37 @@
 
         <div id="step2" class="step-panel">
             <h1>Company Initiatives or Pain Points</h1>
-            <p class="subtitle">Select multiple options below:</p>
-            <div id="painPills" class="pill-container"></div>
-            <button class="action-btn" onclick="submitPainPointsForm()">Submit & View Recommendations</button>
+            <p class="subtitle">Select initiatives that matter to you:</p>
+            
+            <div class="form-group">
+                <input type="text" id="searchIntentions" placeholder="Search initiatives..." onkeyup="debounceSearch()">
+            </div>
+            
+            <div id="topIntentionsSection">
+                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Top Initiatives for Your Pillar & Industry</h3>
+                <div id="topIntentionsPills" class="pill-container"></div>
+            </div>
+            
+            <div id="searchResultsSection" style="display: none;">
+                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Search Results</h3>
+                <div id="searchResultsPills" class="pill-container"></div>
+            </div>
+            
+            <div id="selectedSection" style="margin-top: 2rem; padding: 1rem; background: #f5f5f7; border-radius: 8px; display: none;">
+                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Selected Initiatives</h3>
+                <div id="selectedPills" class="pill-container"></div>
+            </div>
+            
+            <button class="action-btn" onclick="submitPainPointsForm()" style="margin-top: 2rem;">Submit & View Recommendations</button>
         </div>
     </div>
 
     <script>
         let currentRecord = null;
         let selectedIntentionIds = new Set();
+        let allIntentions = [];
+        let topIntentions = [];
+        let searchTimeout;
 
         window.onload = async () => {
             const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
@@ -83,29 +113,126 @@
                 pillarId: document.getElementById('pillarSelect').value
             };
             
-            const res = await fetch(`/api/intentions?pillarId=${currentRecord.pillarId}`);
+            // Fetch top 4 intentions + all intentions with scores
+            const res = await fetch(`/api/intentions-with-scores?pillarId=${currentRecord.pillarId}&industryId=${currentRecord.industryId}`);
             const data = await res.json();
-            document.getElementById('painPills').innerHTML = data.intentions.map(i => 
-                `<div class="pill" onclick="togglePill(this, ${i.id})">${i.label}</div>`
-            ).join('');
             
-            document.getElementById('step1').style.display = 'none';
-            document.getElementById('step2').style.display = 'block';
+            topIntentions = data.topIntentions;
+            allIntentions = data.allIntentions;
+            
+            // Render top 4 intentions
+            renderTopIntentions();
+            
+            // Clear search
+            document.getElementById('searchIntentions').value = '';
+            document.getElementById('searchResultsSection').style.display = 'none';
+            document.getElementById('selectedSection').style.display = 'none';
+            selectedIntentionIds.clear();
+            
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
         }
 
-        function togglePill(el, id) {
+        function renderTopIntentions() {
+            const html = topIntentions.map(i => 
+                `<div class="pill" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
+                    ${i.label}
+                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
+                </div>`
+            ).join('');
+            document.getElementById('topIntentionsPills').innerHTML = html;
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            const query = document.getElementById('searchIntentions').value.trim();
+            
+            if (!query) {
+                document.getElementById('searchResultsSection').style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => performSearch(query), 300);
+        }
+
+        function performSearch(query) {
+            const queryLower = query.toLowerCase();
+            const results = allIntentions.filter(i => 
+                i.label.toLowerCase().includes(queryLower) &&
+                !topIntentions.some(t => t.id === i.id)
+            );
+            
+            if (results.length === 0) {
+                document.getElementById('searchResultsSection').style.display = 'none';
+                return;
+            }
+            
+            const html = results.map(i => 
+                `<div class="pill" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
+                    ${i.label}
+                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
+                </div>`
+            ).join('');
+            
+            document.getElementById('searchResultsPills').innerHTML = html;
+            document.getElementById('searchResultsSection').style.display = 'block';
+        }
+
+        function toggleIntention(el, id) {
             el.classList.toggle('active');
-            selectedIntentionIds.has(id) ? selectedIntentionIds.delete(id) : selectedIntentionIds.add(id);
+            
+            if (selectedIntentionIds.has(id)) {
+                selectedIntentionIds.delete(id);
+            } else {
+                selectedIntentionIds.add(id);
+            }
+            
+            updateSelectedDisplay();
+        }
+
+        function updateSelectedDisplay() {
+            const selectedSection = document.getElementById('selectedSection');
+            
+            if (selectedIntentionIds.size === 0) {
+                selectedSection.style.display = 'none';
+                return;
+            }
+            
+            selectedSection.style.display = 'block';
+            
+            const selectedIntentions = allIntentions.filter(i => selectedIntentionIds.has(i.id));
+            const html = selectedIntentions.map(i => 
+                `<div class="pill active" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
+                    ${i.label}
+                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
+                </div>`
+            ).join('');
+            
+            document.getElementById('selectedPills').innerHTML = html;
         }
 
         async function submitPainPointsForm() {
+            if (selectedIntentionIds.size === 0) {
+                alert('Please select at least one initiative.');
+                return;
+            }
+
             document.getElementById('mainContainer').innerHTML = '<h1>Analyzing Matches...</h1>';
+            
+            // Step 1: Submit lead with selected intentions
             const res = await fetch('/api/submit-lead', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...currentRecord, intentionIds: Array.from(selectedIntentionIds) })
             });
             const result = await res.json();
+
+            // Step 2: Update engagement scores for selected intentions
+            await fetch('/api/update-intention-scores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ intentionIds: Array.from(selectedIntentionIds) })
+            });
             
             const container = document.getElementById('mainContainer');
             container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
@@ -119,7 +246,6 @@
                 const card = document.createElement('div');
                 card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:20px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
                 
-                // Construct logo element cleanly if logo_url is stored in database record
                 let logoImg = '';
                 if (prod.logo_url) {
                     logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: 45px; max-width: 140px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
