@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discovery Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #f5f5f7; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; }
         .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); max-width: 600px; width: 100%; }
@@ -16,14 +17,6 @@
         input, select { width: 100%; padding: 12px; font-size: 0.95rem; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; }
         input:focus { outline: none; border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1); }
         
-        .pill-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
-        .pill { padding: 10px 16px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; background: white; color: #1d1d1f; }
-        .pill:hover { border-color: #0071e3; background-color: #f0f6ff; }
-        .pill.active { background-color: #34c759; border-color: #34c759; color: white; }
-        .pill.active:hover { background-color: #30b24f; }
-        
-        .pill-score { font-size: 0.7rem; opacity: 0.7; display: block; margin-top: 2px; }
-        
         .action-btn { width: 100%; background-color: #1d1d1f; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 1rem; font-weight: 600; transition: background 0.2s; }
         .action-btn:hover { background-color: #424245; }
         #popBtn { width: 100%; padding: 12px; background: #0071e3; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 2rem; font-weight: 600; transition: background 0.2s; }
@@ -31,6 +24,21 @@
         
         .step-panel { display: none; }
         .step-panel.active { display: block; }
+        
+        /* Tom Select customizations */
+        .ts-control { border: 1px solid #d2d2d7; border-radius: 8px; padding: 4px; }
+        .ts-control:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1); }
+        .ts-dropdown { border: 1px solid #d2d2d7; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .ts-dropdown .ts-dropdown-content .option { padding: 10px 12px; }
+        
+        .ts-item { background-color: #0071e3; border-color: #0071e3; border-radius: 6px; padding: 6px 8px; }
+        .ts-item.top-4-suggestion { background-color: #f0f0f0; color: #1d1d1f; border-color: #d2d2d7; }
+        .ts-item.top-4-suggestion.selected { background-color: #0071e3; color: white; border-color: #0071e3; }
+        .ts-item.top-4-suggestion button { color: inherit; }
+        
+        .option.top-4-group { font-weight: 600; color: #86868b; font-size: 0.85rem; padding-top: 12px; padding-bottom: 6px; }
+        .option.top-4-item { padding-left: 20px; }
+        .option.search-group { font-weight: 600; color: #86868b; font-size: 0.85rem; padding-top: 12px; padding-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -57,34 +65,23 @@
             <p class="subtitle">Select initiatives that matter to you:</p>
             
             <div class="form-group">
-                <input type="text" id="searchIntentions" placeholder="Search initiatives..." onkeyup="debounceSearch()">
-            </div>
-            
-            <div id="topIntentionsSection">
-                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Top Initiatives for Your Pillar & Industry</h3>
-                <div id="topIntentionsPills" class="pill-container"></div>
-            </div>
-            
-            <div id="searchResultsSection" style="display: none;">
-                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Search Results</h3>
-                <div id="searchResultsPills" class="pill-container"></div>
-            </div>
-            
-            <div id="selectedSection" style="margin-top: 2rem; padding: 1rem; background: #f5f5f7; border-radius: 8px; display: none;">
-                <h3 style="font-size: 0.95rem; color: #86868b; margin-bottom: 0.75rem; font-weight: 600;">Selected Initiatives</h3>
-                <div id="selectedPills" class="pill-container"></div>
+                <select id="intentionSelect" multiple placeholder="Search or select initiatives..."></select>
             </div>
             
             <button class="action-btn" onclick="submitPainPointsForm()" style="margin-top: 2rem;">Submit & View Recommendations</button>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         let currentRecord = null;
         let selectedIntentionIds = new Set();
         let allIntentions = [];
         let topIntentions = [];
-        let searchTimeout;
+        let topIntentionIds = new Set();
+        let tomSelectInstance = null;
+        let fuzzySearcher = null;
 
         window.onload = async () => {
             const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
@@ -119,96 +116,138 @@
             
             topIntentions = data.topIntentions;
             allIntentions = data.allIntentions;
+            topIntentionIds = new Set(topIntentions.map(t => t.id));
             
-            // Render top 4 intentions
-            renderTopIntentions();
+            // Initialize fuzzy searcher
+            fuzzySearcher = new Fuse(allIntentions, {
+                keys: ['label'],
+                threshold: 0.3,
+                includeScore: true
+            });
             
-            // Clear search
-            document.getElementById('searchIntentions').value = '';
-            document.getElementById('searchResultsSection').style.display = 'none';
-            document.getElementById('selectedSection').style.display = 'none';
-            selectedIntentionIds.clear();
+            // Initialize Tom Select after a brief delay to ensure DOM is ready
+            setTimeout(initializeTomSelect, 100);
             
             document.getElementById('step1').classList.remove('active');
             document.getElementById('step2').classList.add('active');
         }
 
-        function renderTopIntentions() {
-            const html = topIntentions.map(i => 
-                `<div class="pill" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
-                    ${i.label}
-                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
-                </div>`
-            ).join('');
-            document.getElementById('topIntentionsPills').innerHTML = html;
+        function initializeTomSelect() {
+            if (tomSelectInstance) {
+                tomSelectInstance.destroy();
+            }
+
+            const selectElement = document.getElementById('intentionSelect');
+            
+            // Build options with top 4 at top
+            const optionGroups = buildOptionGroups();
+
+            tomSelectInstance = new TomSelect(selectElement, {
+                items: [],
+                options: optionGroups,
+                plugins: {
+                    'remove_button': {
+                        title: 'Remove this item'
+                    }
+                },
+                placeholder: 'Search or select initiatives...',
+                searchField: ['label'],
+                onChange: (values) => {
+                    selectedIntentionIds.clear();
+                    values.forEach(v => selectedIntentionIds.add(parseInt(v)));
+                },
+                onRemove: (value) => {
+                    const id = parseInt(value);
+                    selectedIntentionIds.delete(id);
+                },
+                optgroupField: 'group',
+                optgroupLabelField: 'groupLabel',
+                optgroupValueField: 'groupValue',
+                optgroupRenderer: (data, escapeHtml) => {
+                    return `<div class="optgroup" style="padding-top: 12px; padding-bottom: 6px; font-weight: 600; color: #86868b; font-size: 0.85rem;">${escapeHtml(data.groupLabel)}</div>`;
+                },
+                render: {
+                    item: renderTomSelectItem,
+                    option: renderTomSelectOption
+                },
+                score: (search) => {
+                    if (!search || !search.trim()) return () => 1;
+                    
+                    const fuse = new Fuse(allIntentions, {
+                        keys: ['label'],
+                        threshold: 0.3,
+                        includeScore: true
+                    });
+                    
+                    const results = fuse.search(search);
+                    const scoreMap = {};
+                    results.forEach(r => {
+                        scoreMap[r.item.id] = 1 - r.score;
+                    });
+                    
+                    return (item) => {
+                        return scoreMap[item.id] !== undefined ? scoreMap[item.id] : 0;
+                    };
+                }
+            });
         }
 
-        function debounceSearch() {
-            clearTimeout(searchTimeout);
-            const query = document.getElementById('searchIntentions').value.trim();
+        function buildOptionGroups() {
+            const options = [];
             
-            if (!query) {
-                document.getElementById('searchResultsSection').style.display = 'none';
-                return;
+            // Top 4 group
+            if (topIntentions.length > 0) {
+                options.push({
+                    group: 'top4',
+                    groupLabel: 'Top Initiatives for Your Pillar & Industry',
+                    groupValue: 'top4'
+                });
+                
+                topIntentions.forEach(intention => {
+                    options.push({
+                        value: String(intention.id),
+                        label: intention.label,
+                        group: 'top4',
+                        isTop4: true,
+                        blendedScore: intention.blendedScore
+                    });
+                });
             }
             
-            searchTimeout = setTimeout(() => performSearch(query), 300);
+            // All other intentions
+            const otherIntentions = allIntentions.filter(i => !topIntentionIds.has(i.id));
+            if (otherIntentions.length > 0) {
+                options.push({
+                    group: 'search',
+                    groupLabel: 'Other Initiatives',
+                    groupValue: 'search'
+                });
+                
+                otherIntentions.forEach(intention => {
+                    options.push({
+                        value: String(intention.id),
+                        label: intention.label,
+                        group: 'search',
+                        isTop4: false,
+                        blendedScore: intention.blendedScore
+                    });
+                });
+            }
+            
+            return options;
         }
 
-        function performSearch(query) {
-            const queryLower = query.toLowerCase();
-            const results = allIntentions.filter(i => 
-                i.label.toLowerCase().includes(queryLower) &&
-                !topIntentions.some(t => t.id === i.id)
-            );
-            
-            if (results.length === 0) {
-                document.getElementById('searchResultsSection').style.display = 'none';
-                return;
-            }
-            
-            const html = results.map(i => 
-                `<div class="pill" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
-                    ${i.label}
-                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
-                </div>`
-            ).join('');
-            
-            document.getElementById('searchResultsPills').innerHTML = html;
-            document.getElementById('searchResultsSection').style.display = 'block';
+        function renderTomSelectItem(data, escapeHtml) {
+            const isTop4 = data.isTop4;
+            const classStr = isTop4 ? 'top-4-suggestion selected' : '';
+            return `<div class="ts-item ${classStr}" data-is-top4="${isTop4}">${escapeHtml(data.label)}</div>`;
         }
 
-        function toggleIntention(el, id) {
-            el.classList.toggle('active');
-            
-            if (selectedIntentionIds.has(id)) {
-                selectedIntentionIds.delete(id);
-            } else {
-                selectedIntentionIds.add(id);
-            }
-            
-            updateSelectedDisplay();
-        }
-
-        function updateSelectedDisplay() {
-            const selectedSection = document.getElementById('selectedSection');
-            
-            if (selectedIntentionIds.size === 0) {
-                selectedSection.style.display = 'none';
-                return;
-            }
-            
-            selectedSection.style.display = 'block';
-            
-            const selectedIntentions = allIntentions.filter(i => selectedIntentionIds.has(i.id));
-            const html = selectedIntentions.map(i => 
-                `<div class="pill active" data-id="${i.id}" onclick="toggleIntention(this, ${i.id})">
-                    ${i.label}
-                    <span class="pill-score">Score: ${i.blendedScore.toFixed(1)}</span>
-                </div>`
-            ).join('');
-            
-            document.getElementById('selectedPills').innerHTML = html;
+        function renderTomSelectOption(data, escapeHtml) {
+            const isTop4 = data.isTop4;
+            const score = data.blendedScore ? data.blendedScore.toFixed(1) : '';
+            const scoreStr = score ? ` <span style="color: #999; font-size: 0.85rem;">(${score})</span>` : '';
+            return `<div class="option ${isTop4 ? 'top-4-item' : ''}">${escapeHtml(data.label)}${scoreStr}</div>`;
         }
 
         async function submitPainPointsForm() {

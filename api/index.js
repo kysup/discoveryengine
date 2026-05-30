@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import express from 'express';
 import path from 'path';
+import Fuse from 'fuse.js';
 
 const app = express();
 app.use(express.json());
@@ -235,12 +236,14 @@ app.get(['/api/intentions', '/intentions'], async (req, res) => {
             .filter(item => item.intentions !== null)
             .map(item => item.intentions);
 
-        // Filter by search query if provided
+        // Filter by search query if provided, using fuzzy matching
         if (search && search.trim()) {
-            const searchLower = search.toLowerCase();
-            matchingIntentions = matchingIntentions.filter(i => 
-                i.label.toLowerCase().includes(searchLower)
-            );
+            const fuse = new Fuse(matchingIntentions, {
+                keys: ['label'],
+                threshold: 0.3,
+                includeScore: true
+            });
+            matchingIntentions = fuse.search(search).map(result => result.item);
         }
 
         return res.json({ intentions: matchingIntentions });
