@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discovery Engine</title>
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #f5f5f7; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; }
-        .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); max-width: 600px; width: 100%; }
+        .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); max-width: 900px; width: 100%; }
         h1 { color: #1d1d1f; font-size: 1.5rem; margin: 0 0 0.25rem 0; }
         h3 { margin: 0; }
         p.subtitle { color: #86868b; font-size: 0.95rem; margin-bottom: 2rem; }
@@ -25,20 +24,35 @@
         .step-panel { display: none; }
         .step-panel.active { display: block; }
         
-        /* Tom Select customizations */
-        .ts-control { border: 1px solid #d2d2d7; border-radius: 8px; padding: 4px; }
-        .ts-control:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1); }
-        .ts-dropdown { border: 1px solid #d2d2d7; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .ts-dropdown .ts-dropdown-content .option { padding: 10px 12px; }
+        /* Play button layout */
+        .intentions-layout { display: flex; gap: 2rem; align-items: flex-start; margin-top: 2rem; }
         
-        .ts-item { background-color: #0071e3; border-color: #0071e3; border-radius: 6px; padding: 6px 8px; }
-        .ts-item.top-4-suggestion { background-color: #f0f0f0; color: #1d1d1f; border-color: #d2d2d7; }
-        .ts-item.top-4-suggestion.selected { background-color: #0071e3; color: white; border-color: #0071e3; }
-        .ts-item.top-4-suggestion button { color: inherit; }
+        .left-column { flex: 1; display: flex; flex-direction: column; gap: 2rem; }
         
-        .option.top-4-group { font-weight: 600; color: #86868b; font-size: 0.85rem; padding-top: 12px; padding-bottom: 6px; }
-        .option.top-4-item { padding-left: 20px; }
-        .option.search-group { font-weight: 600; color: #86868b; font-size: 0.85rem; padding-top: 12px; padding-bottom: 6px; }
+        .search-container { flex: 1; }
+        .search-input-wrapper { margin-bottom: 1rem; }
+        .search-input-wrapper input { width: 100%; }
+        .search-results { min-height: 60px; max-height: 200px; overflow-y: auto; padding: 12px; border: 1px solid #d2d2d7; border-radius: 8px; background: #fafafa; }
+        .search-results.empty { color: #86868b; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+        
+        .top-4-container { flex: 1; }
+        .top-4-label { font-size: 0.85rem; font-weight: 600; color: #86868b; margin-bottom: 0.75rem; }
+        .top-4-items { min-height: 60px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 8px; background: #fafafa; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+        
+        .selections-container { flex: 0.6; display: flex; flex-direction: column; justify-content: center; }
+        .selections-label { font-size: 0.85rem; font-weight: 600; color: #86868b; margin-bottom: 0.75rem; }
+        .selections { min-height: 150px; padding: 12px; border: 2px solid #d2d2d7; border-radius: 8px; background: #f9fafb; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+        .selections.empty { color: #86868b; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+        
+        .pill { padding: 10px 14px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; background: white; color: #1d1d1f; white-space: nowrap; }
+        .pill:hover { border-color: #0071e3; background-color: #f0f6ff; }
+        .pill.top-4 { background: #f0f0f0; border-color: #d2d2d7; }
+        .pill.top-4:hover { background: #e8e8ed; }
+        .pill.selected { background-color: #0071e3; border-color: #0071e3; color: white; }
+        .pill.selected:hover { background-color: #0066d6; }
+        
+        .pill-remove { margin-left: 6px; cursor: pointer; font-weight: bold; opacity: 0.7; }
+        .pill-remove:hover { opacity: 1; }
     </style>
 </head>
 <body>
@@ -64,8 +78,29 @@
             <h1>Company Initiatives or Pain Points</h1>
             <p class="subtitle">Select initiatives that matter to you:</p>
             
-            <div class="form-group">
-                <select id="intentionSelect" multiple placeholder="Search or select initiatives..."></select>
+            <div class="intentions-layout">
+                <!-- Left Column: Search + Top 4 -->
+                <div class="left-column">
+                    <!-- Search Container -->
+                    <div class="search-container">
+                        <div class="search-input-wrapper">
+                            <input type="text" id="searchIntentions" placeholder="Search initiatives..." onkeyup="handleSearch()">
+                        </div>
+                        <div id="searchResults" class="search-results empty">No results</div>
+                    </div>
+                    
+                    <!-- Top 4 Container -->
+                    <div class="top-4-container">
+                        <div class="top-4-label">Top Initiatives for Your Pillar & Industry</div>
+                        <div id="topIntentionsContainer" class="top-4-items"></div>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Selections -->
+                <div class="selections-container">
+                    <div class="selections-label">Selected</div>
+                    <div id="selectedContainer" class="selections empty">No selections</div>
+                </div>
             </div>
             
             <button class="action-btn" onclick="submitPainPointsForm()" style="margin-top: 2rem;">Submit & View Recommendations</button>
@@ -73,15 +108,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         let currentRecord = null;
         let selectedIntentionIds = new Set();
         let allIntentions = [];
         let topIntentions = [];
         let topIntentionIds = new Set();
-        let tomSelectInstance = null;
         let fuzzySearcher = null;
+        let searchTimeout;
 
         window.onload = async () => {
             const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
@@ -125,129 +159,119 @@
                 includeScore: true
             });
             
-            // Initialize Tom Select after a brief delay to ensure DOM is ready
-            setTimeout(initializeTomSelect, 100);
+            // Render top 4 intentions
+            renderTopIntentions();
+            
+            // Clear search
+            document.getElementById('searchIntentions').value = '';
+            document.getElementById('searchResults').innerHTML = '<div class="empty">No results</div>';
+            selectedIntentionIds.clear();
+            updateSelectedDisplay();
             
             document.getElementById('step1').classList.remove('active');
             document.getElementById('step2').classList.add('active');
         }
 
-        function initializeTomSelect() {
-            if (tomSelectInstance) {
-                tomSelectInstance.destroy();
-            }
+        function renderTopIntentions() {
+            const html = topIntentions.map(i => 
+                `<div class="pill top-4" data-id="${i.id}" onclick="selectIntention(${i.id}, true)">
+                    ${i.label}
+                </div>`
+            ).join('');
+            document.getElementById('topIntentionsContainer').innerHTML = html;
+        }
 
-            const selectElement = document.getElementById('intentionSelect');
+        function handleSearch() {
+            clearTimeout(searchTimeout);
+            const query = document.getElementById('searchIntentions').value.trim();
             
-            // Build options with top 4 at top
-            const optionGroups = buildOptionGroups();
+            if (!query) {
+                document.getElementById('searchResults').innerHTML = '<div class="empty">No results</div>';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => performSearch(query), 300);
+        }
 
-            tomSelectInstance = new TomSelect(selectElement, {
-                items: [],
-                options: optionGroups,
-                plugins: {
-                    'remove_button': {
-                        title: 'Remove this item'
+        function performSearch(query) {
+            if (!fuzzySearcher) return;
+            
+            // Use fuzzy matching to find results
+            const results = fuzzySearcher.search(query).map(result => result.item);
+            
+            // Filter out items that are already selected or in top 4
+            const filtered = results.filter(i => 
+                !selectedIntentionIds.has(i.id) && 
+                !topIntentionIds.has(i.id)
+            );
+            
+            if (filtered.length === 0) {
+                document.getElementById('searchResults').innerHTML = '<div class="empty">No results</div>';
+                return;
+            }
+            
+            const html = filtered.map(i => 
+                `<div class="pill" data-id="${i.id}" onclick="selectIntention(${i.id}, false)">
+                    ${i.label}
+                </div>`
+            ).join('');
+            
+            document.getElementById('searchResults').innerHTML = html;
+        }
+
+        function selectIntention(id, isTop4) {
+            selectedIntentionIds.add(id);
+            
+            // Remove from search results or top 4
+            if (isTop4) {
+                const pill = document.querySelector(`#topIntentionsContainer .pill[data-id="${id}"]`);
+                if (pill) pill.style.display = 'none';
+            } else {
+                const pill = document.querySelector(`#searchResults .pill[data-id="${id}"]`);
+                if (pill) pill.style.display = 'none';
+            }
+            
+            updateSelectedDisplay();
+        }
+
+        function removeSelection(id) {
+            selectedIntentionIds.delete(id);
+            
+            // Show the item again in its original location
+            const intention = allIntentions.find(i => i.id === id);
+            if (intention) {
+                if (topIntentionIds.has(id)) {
+                    const pill = document.querySelector(`#topIntentionsContainer .pill[data-id="${id}"]`);
+                    if (pill) pill.style.display = 'block';
+                } else {
+                    // Re-run search to show it again if search is active
+                    const query = document.getElementById('searchIntentions').value.trim();
+                    if (query) {
+                        performSearch(query);
                     }
-                },
-                placeholder: 'Search or select initiatives...',
-                searchField: ['label'],
-                onChange: (values) => {
-                    selectedIntentionIds.clear();
-                    values.forEach(v => selectedIntentionIds.add(parseInt(v)));
-                },
-                onRemove: (value) => {
-                    const id = parseInt(value);
-                    selectedIntentionIds.delete(id);
-                },
-                optgroupField: 'group',
-                optgroupLabelField: 'groupLabel',
-                optgroupValueField: 'groupValue',
-                optgroupRenderer: (data, escapeHtml) => {
-                    return `<div class="optgroup" style="padding-top: 12px; padding-bottom: 6px; font-weight: 600; color: #86868b; font-size: 0.85rem;">${escapeHtml(data.groupLabel)}</div>`;
-                },
-                render: {
-                    item: renderTomSelectItem,
-                    option: renderTomSelectOption
-                },
-                score: (search) => {
-                    if (!search || !search.trim()) return () => 1;
-                    
-                    const fuse = new Fuse(allIntentions, {
-                        keys: ['label'],
-                        threshold: 0.3,
-                        includeScore: true
-                    });
-                    
-                    const results = fuse.search(search);
-                    const scoreMap = {};
-                    results.forEach(r => {
-                        scoreMap[r.item.id] = 1 - r.score;
-                    });
-                    
-                    return (item) => {
-                        return scoreMap[item.id] !== undefined ? scoreMap[item.id] : 0;
-                    };
                 }
-            });
-        }
-
-        function buildOptionGroups() {
-            const options = [];
-            
-            // Top 4 group
-            if (topIntentions.length > 0) {
-                options.push({
-                    group: 'top4',
-                    groupLabel: 'Top Initiatives for Your Pillar & Industry',
-                    groupValue: 'top4'
-                });
-                
-                topIntentions.forEach(intention => {
-                    options.push({
-                        value: String(intention.id),
-                        label: intention.label,
-                        group: 'top4',
-                        isTop4: true,
-                        blendedScore: intention.blendedScore
-                    });
-                });
             }
             
-            // All other intentions
-            const otherIntentions = allIntentions.filter(i => !topIntentionIds.has(i.id));
-            if (otherIntentions.length > 0) {
-                options.push({
-                    group: 'search',
-                    groupLabel: 'Other Initiatives',
-                    groupValue: 'search'
-                });
-                
-                otherIntentions.forEach(intention => {
-                    options.push({
-                        value: String(intention.id),
-                        label: intention.label,
-                        group: 'search',
-                        isTop4: false,
-                        blendedScore: intention.blendedScore
-                    });
-                });
+            updateSelectedDisplay();
+        }
+
+        function updateSelectedDisplay() {
+            const selectedContainer = document.getElementById('selectedContainer');
+            
+            if (selectedIntentionIds.size === 0) {
+                selectedContainer.innerHTML = '<div class="empty">No selections</div>';
+                return;
             }
             
-            return options;
-        }
-
-        function renderTomSelectItem(data, escapeHtml) {
-            const isTop4 = data.isTop4;
-            const classStr = isTop4 ? 'top-4-suggestion selected' : '';
-            return `<div class="ts-item ${classStr}" data-is-top4="${isTop4}">${escapeHtml(data.label)}</div>`;
-        }
-
-        function renderTomSelectOption(data, escapeHtml) {
-            const isTop4 = data.isTop4;
-            const score = data.blendedScore ? data.blendedScore.toFixed(1) : '';
-            const scoreStr = score ? ` <span style="color: #999; font-size: 0.85rem;">(${score})</span>` : '';
-            return `<div class="option ${isTop4 ? 'top-4-item' : ''}">${escapeHtml(data.label)}${scoreStr}</div>`;
+            const selectedIntentions = allIntentions.filter(i => selectedIntentionIds.has(i.id));
+            const html = selectedIntentions.map(i => 
+                `<div class="pill selected" data-id="${i.id}">
+                    ${i.label}
+                    <span class="pill-remove" onclick="removeSelection(${i.id})">×</span>
+                </div>`
+            ).join('');
+            
+            selectedContainer.innerHTML = html;
         }
 
         async function submitPainPointsForm() {
