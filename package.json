@@ -5,7 +5,7 @@
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js",
-    "dev": "nodemon api/index.js"
+    "dev": "node --env-file=.env api/index.js"
   },
   "keywords": [],
   "author": "",

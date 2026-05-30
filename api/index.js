@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import express from 'express';
+import path from 'path';
 
 const app = express();
 app.use(express.json());
@@ -419,5 +420,19 @@ app.post(['/api/update-intention-scores', '/update-intention-scores'], async (re
         return res.status(500).json({ error: err.message });
     }
 });
+
+// Serve the index.html for the root path for testing
+app.get('/', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+
+// Only start a local server if we aren't running in production on Vercel
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 8080;
+  app.listen(PORT, () => {
+    console.log(`🚀 Local server alive at http://localhost:${PORT}`);
+    console.log(`👉 Ready for debugging!`);
+  });
+}
 
 export default app;
