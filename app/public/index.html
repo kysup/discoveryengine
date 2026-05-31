@@ -310,20 +310,31 @@
                 return;
             }
 
+            const cardScales = [1.4, 1.15, 1.0];
+
             result.recommendations.forEach((prod, i) => {
+                const scale = cardScales[i] ?? 1.0;
+                const padding = Math.round(20 * scale);
+                const logoH = Math.round(45 * scale);
+                const logoW = Math.round(140 * scale);
+                const h3Size = (1.15 * scale).toFixed(2);
+                const bySize = (0.8 * scale).toFixed(2);
+                const scoreSize = (0.75 * scale).toFixed(2);
+                const gap = Math.round(8 * scale);
+
                 const card = document.createElement('div');
-                card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:20px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
-                
+                card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:${padding}px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: ${gap}px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
+
                 let logoImg = '';
                 if (prod.logo_url) {
-                    logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: 45px; max-width: 140px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
+                    logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: ${logoH}px; max-width: ${logoW}px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
                 }
 
                 card.innerHTML = `
                     ${logoImg}
-                    <h3 style="margin: 0; color: #1d1d1f; font-size: 1.15rem;">${prod.product_name}</h3>
-                    <span style="font-size: 0.8rem; color: #86868b; font-weight: 500;">by ${prod.company_name}</span>
-                    <span style="display: inline-block; background: #e8e8ed; color: #1d1d1f; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; margin-top: 4px;">Score: ${prod.total_score}</span>
+                    <h3 style="margin: 0; color: #1d1d1f; font-size: ${h3Size}rem;">${prod.product_name}</h3>
+                    <span style="font-size: ${bySize}rem; color: #86868b; font-weight: 500;">by ${prod.company_name}</span>
+                    <span style="display: inline-block; background: #e8e8ed; color: #1d1d1f; font-size: ${scoreSize}rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; margin-top: 4px;">Score: ${prod.total_score}</span>
                 `;
                 document.getElementById('pyramidContainer').appendChild(card);
             });
