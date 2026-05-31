@@ -1,5 +1,5 @@
-import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import express from 'express';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -270,3 +270,5 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 Injector Local server alive at http://localhost:${PORT}`);
   });
 }
+
+export default app;
