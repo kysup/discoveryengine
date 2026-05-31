@@ -8,5 +8,7 @@ A relatively lightweight framework encapsulates a wealth of knowledge I've accum
 The recommendations made here are mostly comprised of Utah SaaS companies.
 
 
-### :mega: Latest Announcement
-The primary engine / framework is finalized and running. Currently working on feeding it with initiatives, pain points and recommendations.
+### :mega: Announcements
+05/30/2026 New injector app is up and running! It allows me to add new Products and Intentions into the engine at an exponentially rapid pace (the core elements). It creates all the records and assocations especially at critical junction tables.
+
+05/25/2026 The primary engine / framework is finalized and running. Currently working on feeding it with initiatives, pain points and recommendations.
