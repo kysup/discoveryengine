@@ -307,7 +307,19 @@
             });
             
             const container = document.getElementById('mainContainer');
-            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
+            container.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; width:100%; margin-bottom:20px;">
+                    <h1 style="margin:0;">Recommended Software</h1>
+                    <div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:320px; flex-shrink:0;">
+                        <p style="margin:0; color:#1d1d1f; font-weight:600; font-size:0.9rem; text-align:right;">Email these suggestions to yourself</p>
+                        <div style="display:flex; gap:8px; width:100%;">
+                            <input type="email" id="recipientEmail" value="${currentRecord.email || ''}" placeholder="you@company.com" style="flex:1; padding:10px 12px; border:1px solid #d2d2d7; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                            <button type="button" id="sendEmailBtn" style="padding:10px 18px; background:#0071e3; color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Send</button>
+                        </div>
+                        <span id="emailStatus" style="font-size:0.85rem; color:#86868b; min-height:1rem; text-align:right;"></span>
+                    </div>
+                </div>
+                <div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
             
             if (!result.recommendations || result.recommendations.length === 0) {
                 document.getElementById('pyramidContainer').innerHTML = `<p style="color:#86868b;">No matching tools found for your configurations.</p>`;
@@ -343,19 +355,7 @@
                 document.getElementById('pyramidContainer').appendChild(card);
             });
 
-            // Email-these-suggestions form (prefilled with the email from Step 1)
-            const emailSection = document.createElement('div');
-            emailSection.style.cssText = `margin-top:30px; width:100%; max-width:420px; display:flex; flex-direction:column; gap:12px; align-items:center;`;
-            emailSection.innerHTML = `
-                <p style="margin:0; color:#1d1d1f; font-weight:600;">Email these suggestions to yourself</p>
-                <div style="display:flex; gap:8px; width:100%;">
-                    <input type="email" id="recipientEmail" value="${currentRecord.email || ''}" placeholder="you@company.com" style="flex:1; padding:10px 12px; border:1px solid #d2d2d7; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
-                    <button type="button" id="sendEmailBtn" style="padding:10px 18px; background:#0071e3; color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Send</button>
-                </div>
-                <span id="emailStatus" style="font-size:0.85rem; color:#86868b; min-height:1rem;"></span>
-            `;
-            container.appendChild(emailSection);
-
+            // Wire up the email-these-suggestions form (rendered in the header, top-right)
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const btn = document.getElementById('sendEmailBtn');
                 const statusEl = document.getElementById('emailStatus');
