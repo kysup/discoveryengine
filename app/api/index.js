@@ -487,8 +487,7 @@ app.post(['/api/email-recommendations', '/email-recommendations'], async (req, r
             // Logo + name + company wrapped in one clickable, content-sized container
             const bundleInner = `
                             ${logo}
-                            <div style="font-size:18px; font-weight:600; color:#1d1d1f;">${prod.product_name}</div>
-                            <div style="font-size:13px; color:#86868b;">by ${prod.company_name}</div>`;
+                            <div style="font-size:18px; font-weight:600; color:#1d1d1f;">${prod.product_name}</div>`;
             const bundle = prod.product_url
                 ? `<a href="${prod.product_url}" target="_blank" style="display:inline-block; padding:8px 16px; border-radius:10px; background:#f5f5f7; text-decoration:none; color:inherit;">${bundleInner}</a>`
                 : `<div style="display:inline-block; padding:8px 16px;">${bundleInner}</div>`;

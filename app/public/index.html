@@ -338,7 +338,6 @@
                 const logoH = Math.round(45 * scale);
                 const logoW = Math.round(140 * scale);
                 const h3Size = (1.15 * scale).toFixed(2);
-                const bySize = (0.8 * scale).toFixed(2);
                 const scoreSize = (0.75 * scale).toFixed(2);
                 const gap = Math.round(8 * scale);
 
@@ -354,7 +353,6 @@
                 const bundleInner = `
                     ${logoImg}
                     <h3 style="margin: 0; color: #1d1d1f; font-size: ${h3Size}rem;">${prod.product_name}</h3>
-                    <span style="font-size: ${bySize}rem; color: #86868b; font-weight: 500;">by ${prod.company_name}</span>
                 `;
                 const bundle = prod.product_url
                     ? `<a href="${prod.product_url}" target="_blank" rel="noopener noreferrer" class="product-link" style="gap:${gap}px;">${bundleInner}</a>`
