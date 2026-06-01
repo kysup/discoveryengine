@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import express from 'express';
 import path from 'path';
 import Fuse from 'fuse.js';
+import { Resend } from 'resend';
 
 const app = express();
 app.use(express.json());
@@ -419,6 +420,76 @@ app.post(['/api/update-intention-scores', '/update-intention-scores'], async (re
             updatedIntentions: results 
         });
 
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 9. POST: Email the recommended stack to the user via Resend
+app.post(['/api/email-recommendations', '/email-recommendations'], async (req, res) => {
+    try {
+        const { email, firstName, companyName, recommendations } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Missing email address.' });
+        }
+        if (!recommendations || !Array.isArray(recommendations) || recommendations.length === 0) {
+            return res.status(400).json({ error: 'No recommendations to send.' });
+        }
+        if (!process.env.RESEND_API_KEY) {
+            return res.status(500).json({ error: 'Email service is not configured (missing RESEND_API_KEY).' });
+        }
+
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+        const cardsHtml = recommendations.map((prod, i) => {
+            const logo = prod.logo_url
+                ? `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height:40px; max-width:120px; object-fit:contain; margin-bottom:8px;">`
+                : '';
+            return `
+                <tr><td style="padding:0 0 16px 0;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #d2d2d7; border-radius:12px;">
+                        <tr><td style="padding:20px; text-align:center; font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+                            <div style="font-size:12px; color:#86868b; font-weight:600;">#${i + 1}</div>
+                            ${logo}
+                            <div style="font-size:18px; font-weight:600; color:#1d1d1f;">${prod.product_name}</div>
+                            <div style="font-size:13px; color:#86868b;">by ${prod.company_name}</div>
+                            <div style="display:inline-block; margin-top:8px; background:#e8e8ed; color:#1d1d1f; font-size:12px; padding:4px 10px; border-radius:12px; font-weight:600;">Score: ${prod.total_score}</div>
+                        </td></tr>
+                    </table>
+                </td></tr>`;
+        }).join('');
+
+        const html = `
+            <div style="background:#f5f5f7; padding:32px 0; font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr><td align="center">
+                        <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;">
+                            <tr><td style="padding:0 20px 8px 20px; text-align:center;">
+                                <h1 style="font-size:22px; color:#1d1d1f; margin:0 0 4px 0;">Your Recommended Stack</h1>
+                                <p style="font-size:14px; color:#86868b; margin:0 0 20px 0;">
+                                    ${firstName ? `Hi ${firstName}, here` : 'Here'} are your top matches${companyName ? ` for ${companyName}` : ''}.
+                                </p>
+                            </td></tr>
+                            <tr><td style="padding:0 20px;">
+                                <table width="100%" cellpadding="0" cellspacing="0">${cardsHtml}</table>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                </table>
+            </div>`;
+
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const { data, error } = await resend.emails.send({
+            from: `Discovery Engine <${fromEmail}>`,
+            to: [email],
+            subject: 'Your Recommended Software Stack',
+            html
+        });
+
+        if (error) throw new Error(error.message || 'Resend failed to send the email.');
+
+        return res.json({ success: true, id: data?.id });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
