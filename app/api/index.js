@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import express from 'express';
 import path from 'path';
 import Fuse from 'fuse.js';
+import { Resend } from 'resend';
 
 const app = express();
 app.use(express.json());
@@ -151,11 +152,13 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
             return res.status(201).json({ success: true, leadId: newLead.id, recommendations: [] });
         }
 
-        // Step B: Grab scores, justifications, and parent metadata for the valid products matching selected intentions
+        // Step B: Grab scores, justifications, owning intention, and parent metadata for
+        // the valid products matching selected intentions
         const { data: scoringData, error: scoringError } = await supabase
             .from('product_intentions')
             .select(`
                 product_id,
+                intention_id,
                 score,
                 justification,
                 products (
@@ -171,12 +174,41 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
 
         if (scoringError) throw scoringError;
 
-        // Step C: Aggregate and compute cumulative scores per product in JavaScript
+        // Step C: Compute each selected intention's blended score, mirroring step 2.
+        // productAffinity = sum of product_intentions.score across this industry's
+        // products (scoringData is already industry- and selection-filtered).
+        const selectedIntentionIds = intentionIds.map(id => parseInt(id));
+
+        const affinityMap = {};
+        scoringData.forEach(row => {
+            if (!row.products) return;
+            affinityMap[row.intention_id] = (affinityMap[row.intention_id] || 0) + (row.score || 0);
+        });
+
+        const { data: engagementScores, error: engError } = await supabase
+            .from('intention_scores')
+            .select('intention_id, engagement_score')
+            .in('intention_id', selectedIntentionIds);
+
+        if (engError) throw engError;
+
+        const engagementMap = {};
+        engagementScores.forEach(es => {
+            engagementMap[es.intention_id] = es.engagement_score || 0;
+        });
+
+        const blendedMap = {};
+        selectedIntentionIds.forEach(iId => {
+            blendedMap[iId] = ((affinityMap[iId] || 0) + (engagementMap[iId] || 0)) / 2;
+        });
+
+        // Step D: Aggregate per-product scores, weighting each product_intentions.score
+        // by its intention's blended score (product affinity x engagement signal).
         const scoreTracker = {};
         scoringData.forEach(row => {
             if (!row.products) return;
             const pId = row.product_id;
-            
+
             if (!scoreTracker[pId]) {
                 scoreTracker[pId] = {
                     product_id: pId,
@@ -188,16 +220,18 @@ app.post(['/api/submit-lead', '/submit-lead'], async (req, res) => {
                     justifications: []
                 };
             }
-            scoreTracker[pId].total_score += (row.score || 0);
+            const weight = blendedMap[row.intention_id] || 0;
+            scoreTracker[pId].total_score += (row.score || 0) * weight;
             if (row.justification) {
                 scoreTracker[pId].justifications.push(row.justification);
             }
         });
 
-        // Step D: Sort down descending by score and slice off the top 3
+        // Step E: Sort descending by blended score, take the top 3, round for display
         const topRecommendations = Object.values(scoreTracker)
             .sort((a, b) => b.total_score - a.total_score)
-            .slice(0, 3);
+            .slice(0, 3)
+            .map(p => ({ ...p, total_score: Math.round(p.total_score) }));
 
         return res.status(201).json({ 
             success: true, 
@@ -283,15 +317,7 @@ app.get(['/api/intentions-with-scores', '/intentions-with-scores'], async (req, 
             return res.json({ topIntentions: [], allIntentions: [] });
         }
 
-        // Step B: Get product affinity scores for each intention in this industry
-        const { data: productIntentions, error: prodError } = await supabase
-            .from('product_intentions')
-            .select('intention_id, score')
-            .in('intention_id', intentionIds);
-
-        if (prodError) throw prodError;
-
-        // Filter products by industry
+        // Step B: Find which products belong to the Lead's industry
         const { data: industryProducts, error: indError } = await supabase
             .from('product_industries')
             .select('product_id')
@@ -300,12 +326,21 @@ app.get(['/api/intentions-with-scores', '/intentions-with-scores'], async (req, 
         if (indError) throw indError;
         const validProductIds = new Set(industryProducts.map(p => p.product_id));
 
-        // Aggregate product affinity per intention (only valid industry products)
+        // Get product affinity scores per intention, keeping product_id so we can
+        // restrict the sum to products that actually serve this industry.
+        const { data: productIntentions, error: prodError } = await supabase
+            .from('product_intentions')
+            .select('intention_id, product_id, score')
+            .in('intention_id', intentionIds);
+
+        if (prodError) throw prodError;
+
+        // Aggregate product affinity per intention, counting ONLY products in this
+        // industry. An intention with no industry products never gets a key here, so
+        // it is treated as industry-ineligible in step D.
         const productAffinityMap = {};
         productIntentions.forEach(pi => {
-            // Note: product_intentions doesn't store product_id in the select above
-            // We need to validate against industry - simplified approach:
-            // Sum all product_intentions scores per intention, then we'll filter by industry
+            if (!validProductIds.has(pi.product_id)) return;
             if (!productAffinityMap[pi.intention_id]) {
                 productAffinityMap[pi.intention_id] = 0;
             }
@@ -325,9 +360,13 @@ app.get(['/api/intentions-with-scores', '/intentions-with-scores'], async (req, 
             engagementMap[es.intention_id] = es.engagement_score || 0;
         });
 
-        // Step D: Build scored intentions list and calculate blended scores
+        // Step D: Build scored intentions list and calculate blended scores.
+        // Industry hard-filter: only keep intentions that have at least one product in
+        // this industry (an entry in productAffinityMap). These are the only intentions
+        // that can yield product suggestions in step 3, so dead-ends are excluded.
         const scoredIntentions = pillarIntentions
             .filter(item => item.intentions !== null)
+            .filter(item => productAffinityMap.hasOwnProperty(item.intention_id))
             .map(item => {
                 const iId = item.intention_id;
                 const productAffinity = productAffinityMap[iId] || 0;
@@ -349,10 +388,10 @@ app.get(['/api/intentions-with-scores', '/intentions-with-scores'], async (req, 
             .sort((a, b) => b.blendedScore - a.blendedScore)
             .slice(0, 4);
 
-        // Return both top 4 and all intentions for search
-        return res.json({ 
-            topIntentions, 
-            allIntentions: scoredIntentions 
+        // Return both top 4 and all industry-eligible intentions (used for search)
+        return res.json({
+            topIntentions,
+            allIntentions: scoredIntentions
         });
 
     } catch (err) {
@@ -419,6 +458,81 @@ app.post(['/api/update-intention-scores', '/update-intention-scores'], async (re
             updatedIntentions: results 
         });
 
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 9. POST: Email the recommended stack to the user via Resend
+app.post(['/api/email-recommendations', '/email-recommendations'], async (req, res) => {
+    try {
+        const { email, firstName, companyName, recommendations } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Missing email address.' });
+        }
+        if (!recommendations || !Array.isArray(recommendations) || recommendations.length === 0) {
+            return res.status(400).json({ error: 'No recommendations to send.' });
+        }
+        if (!process.env.RESEND_API_KEY) {
+            return res.status(500).json({ error: 'Email service is not configured (missing RESEND_API_KEY).' });
+        }
+
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+        const cardsHtml = recommendations.map((prod, i) => {
+            const logo = prod.logo_url
+                ? `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height:40px; max-width:120px; object-fit:contain; margin-bottom:8px;">`
+                : '';
+            // Logo + name + company wrapped in one clickable, content-sized container
+            const bundleInner = `
+                            ${logo}
+                            <div style="font-size:18px; font-weight:600; color:#1d1d1f;">${prod.product_name}</div>`;
+            const bundle = prod.product_url
+                ? `<a href="${prod.product_url}" target="_blank" style="display:inline-block; padding:8px 16px; border-radius:10px; background:#f5f5f7; text-decoration:none; color:inherit;">${bundleInner}</a>`
+                : `<div style="display:inline-block; padding:8px 16px;">${bundleInner}</div>`;
+            return `
+                <tr><td style="padding:0 0 16px 0;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #d2d2d7; border-radius:12px;">
+                        <tr><td style="padding:20px; text-align:center; font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+                            <div style="font-size:12px; color:#86868b; font-weight:600;">#${i + 1}</div>
+                            <div style="text-align:center;">${bundle}</div>
+                            <div style="display:inline-block; margin-top:8px; background:#e8e8ed; color:#1d1d1f; font-size:12px; padding:4px 10px; border-radius:12px; font-weight:600;">Score: ${prod.total_score}</div>
+                        </td></tr>
+                    </table>
+                </td></tr>`;
+        }).join('');
+
+        const html = `
+            <div style="background:#f5f5f7; padding:32px 0; font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr><td align="center">
+                        <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;">
+                            <tr><td style="padding:0 20px 8px 20px; text-align:center;">
+                                <h1 style="font-size:22px; color:#1d1d1f; margin:0 0 4px 0;">Your Recommended Stack</h1>
+                                <p style="font-size:14px; color:#86868b; margin:0 0 20px 0;">
+                                    ${firstName ? `Hi ${firstName}, here` : 'Here'} are your top matches${companyName ? ` for ${companyName}` : ''}.
+                                </p>
+                            </td></tr>
+                            <tr><td style="padding:0 20px;">
+                                <table width="100%" cellpadding="0" cellspacing="0">${cardsHtml}</table>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                </table>
+            </div>`;
+
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const { data, error } = await resend.emails.send({
+            from: `Discovery Engine <${fromEmail}>`,
+            to: [email],
+            subject: 'Your Recommended Software Stack',
+            html
+        });
+
+        if (error) throw new Error(error.message || 'Resend failed to send the email.');
+
+        return res.json({ success: true, id: data?.id });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

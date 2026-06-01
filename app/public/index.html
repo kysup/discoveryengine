@@ -57,6 +57,10 @@
         
         .pill-remove { cursor: pointer; font-weight: bold; opacity: 0.7; flex-shrink: 0; }
         .pill-remove:hover { opacity: 1; }
+
+        /* Clickable product bundle inside a recommendation card: content-sized, highlights on hover */
+        .product-link { display: inline-flex; flex-direction: column; align-items: center; padding: 4px 12px; border-radius: 10px; background: transparent; text-decoration: none; color: inherit; transition: background 0.2s; }
+        a.product-link:hover { background: #f0f0f5; }
     </style>
 </head>
 <body>
@@ -141,8 +145,12 @@
 
         async function submitLeadForm(event) {
             event.preventDefault();
-            currentRecord = { 
+            currentRecord = {
                 ...currentRecord,
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                email: document.getElementById('email').value,
+                companyName: document.getElementById('companyName').value,
                 companySize: document.getElementById('companySize').value,
                 industryId: document.getElementById('industrySelect').value,
                 pillarId: document.getElementById('pillarSelect').value
@@ -303,29 +311,96 @@
             });
             
             const container = document.getElementById('mainContainer');
-            container.innerHTML = `<h1>Your Recommended Stack</h1><div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
+            container.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; width:100%; margin-bottom:20px;">
+                    <h1 style="margin:0;">Recommended Software</h1>
+                    <div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:320px; flex-shrink:0;">
+                        <p style="margin:0; color:#1d1d1f; font-weight:600; font-size:0.9rem; text-align:right;">Email these suggestions to yourself</p>
+                        <div style="display:flex; gap:8px; width:100%;">
+                            <input type="email" id="recipientEmail" value="${currentRecord.email || ''}" placeholder="you@company.com" style="flex:1; padding:10px 12px; border:1px solid #d2d2d7; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                            <button type="button" id="sendEmailBtn" style="padding:10px 18px; background:#0071e3; color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Send</button>
+                        </div>
+                        <span id="emailStatus" style="font-size:0.85rem; color:#86868b; min-height:1rem; text-align:right;"></span>
+                    </div>
+                </div>
+                <div id="pyramidContainer" style="display:flex; flex-direction:column; gap:15px; align-items:center; width:100%;"></div>`;
             
             if (!result.recommendations || result.recommendations.length === 0) {
                 document.getElementById('pyramidContainer').innerHTML = `<p style="color:#86868b;">No matching tools found for your configurations.</p>`;
                 return;
             }
 
+            const cardScales = [1.6, 1.15, 1.0];
+
             result.recommendations.forEach((prod, i) => {
+                const scale = cardScales[i] ?? 1.0;
+                const padding = Math.round(20 * scale);
+                const logoH = Math.round(45 * scale);
+                const logoW = Math.round(140 * scale);
+                const h3Size = (1.15 * scale).toFixed(2);
+                const scoreSize = (0.75 * scale).toFixed(2);
+                const gap = Math.round(8 * scale);
+
                 const card = document.createElement('div');
-                card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:20px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
-                
+                card.style.cssText = `width:${100-(i*12)}%; background:#white; border: 1px solid #d2d2d7; padding:${padding}px; border-radius:12px; text-align:center; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: ${gap}px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);`;
+
                 let logoImg = '';
                 if (prod.logo_url) {
-                    logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: 45px; max-width: 140px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
+                    logoImg = `<img src="${prod.logo_url}" alt="${prod.product_name}" style="max-height: ${logoH}px; max-width: ${logoW}px; object-fit: contain; margin-bottom: 4px;" onerror="this.style.display='none'">`;
                 }
 
-                card.innerHTML = `
+                // Logo + name + company become one clickable, content-sized link to the product
+                const bundleInner = `
                     ${logoImg}
-                    <h3 style="margin: 0; color: #1d1d1f; font-size: 1.15rem;">${prod.product_name}</h3>
-                    <span style="font-size: 0.8rem; color: #86868b; font-weight: 500;">by ${prod.company_name}</span>
-                    <span style="display: inline-block; background: #e8e8ed; color: #1d1d1f; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; margin-top: 4px;">Score: ${prod.total_score}</span>
+                    <h3 style="margin: 0; color: #1d1d1f; font-size: ${h3Size}rem;">${prod.product_name}</h3>
+                `;
+                const bundle = prod.product_url
+                    ? `<a href="${prod.product_url}" target="_blank" rel="noopener noreferrer" class="product-link" style="gap:${gap}px;">${bundleInner}</a>`
+                    : `<div class="product-link" style="gap:${gap}px;">${bundleInner}</div>`;
+
+                card.innerHTML = `
+                    ${bundle}
+                    <span style="display: inline-block; background: #e8e8ed; color: #1d1d1f; font-size: ${scoreSize}rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; margin-top: 4px;">Score: ${prod.total_score}</span>
                 `;
                 document.getElementById('pyramidContainer').appendChild(card);
+            });
+
+            // Wire up the email-these-suggestions form (rendered in the header, top-right)
+            document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+                const btn = document.getElementById('sendEmailBtn');
+                const statusEl = document.getElementById('emailStatus');
+                const email = document.getElementById('recipientEmail').value.trim();
+                if (!email) {
+                    statusEl.style.color = '#d70015';
+                    statusEl.textContent = 'Please enter an email address.';
+                    return;
+                }
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+                statusEl.style.color = '#86868b';
+                statusEl.textContent = '';
+                try {
+                    const resp = await fetch('/api/email-recommendations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email,
+                            firstName: currentRecord.firstName,
+                            companyName: currentRecord.companyName,
+                            recommendations: result.recommendations
+                        })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.error || 'Failed to send.');
+                    statusEl.style.color = '#1d8a3f';
+                    statusEl.textContent = 'Sent! Check your inbox.';
+                    btn.textContent = 'Sent';
+                } catch (err) {
+                    statusEl.style.color = '#d70015';
+                    statusEl.textContent = err.message;
+                    btn.disabled = false;
+                    btn.textContent = 'Send';
+                }
             });
         }
     </script>
