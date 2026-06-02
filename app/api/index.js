@@ -64,12 +64,30 @@ app.get(['/api/generate-identity', '/generate-identity'], async (req, res) => {
     }
 });
 
-// 3. GET: Fetch pillars (Core Focus)
+// 3. GET: Fetch pillars (Core Focus), flagged by whether any intentions are tied to
+// them and sorted so empty pillars sink to the bottom of the list.
 app.get(['/api/pillars', '/pillars'], async (req, res) => {
     try {
-        const { data, error } = await supabase.from('pillars').select('id, name');
+        const { data: pillars, error } = await supabase.from('pillars').select('id, name');
         if (error) throw error;
-        return res.json({ pillars: data });
+
+        // Which pillars have at least one intention tied to them?
+        const { data: links, error: linkError } = await supabase
+            .from('intention_pillars')
+            .select('pillar_id');
+        if (linkError) throw linkError;
+
+        const pillarsWithIntentions = new Set(links.map(l => l.pillar_id));
+
+        const sortedPillars = pillars
+            .map(p => ({ ...p, hasIntentions: pillarsWithIntentions.has(p.id) }))
+            .sort((a, b) => {
+                // Pillars with intentions first, then alphabetical within each group
+                if (a.hasIntentions !== b.hasIntentions) return a.hasIntentions ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+
+        return res.json({ pillars: sortedPillars });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
