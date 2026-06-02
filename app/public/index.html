@@ -28,25 +28,56 @@
         /* Step 2 button sizing */
         #step2 .action-btn { width: auto; padding: 12px 32px; display: block; margin: 2rem auto 0; }
         
-        /* Play button layout */
-        .intentions-layout { display: flex; gap: 1.5rem; align-items: flex-start; margin-top: 2rem; height: 100%; }
-        
-        .left-column { flex: 0 0 45%; display: flex; flex-direction: column; gap: 2rem; overflow: hidden; }
-        
-        .search-container { flex: 1; min-width: 0; }
-        .search-input-wrapper { margin-bottom: 1rem; }
-        .search-input-wrapper input { width: 100%; }
-        .search-results { min-height: 60px; max-height: 200px; overflow-y: auto; padding: 12px; border: 1px solid #d2d2d7; border-radius: 8px; background: #fafafa; }
-        .search-results.empty { color: #86868b; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
-        
-        .top-4-container { flex: 1; min-width: 0; }
-        .top-4-label { font-size: 0.85rem; font-weight: 600; color: #86868b; margin-bottom: 0.75rem; }
-        .top-4-items { min-height: 60px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 8px; background: #fafafa; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; overflow: hidden; }
-        
-        .selections-container { flex: 0 0 45%; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .selections-label { font-size: 0.85rem; font-weight: 600; color: #86868b; margin-bottom: 0.75rem; }
-        .selections { min-height: 150px; max-height: 400px; padding: 12px; border: 2px solid #d2d2d7; border-radius: 8px; background: #f9fafb; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; overflow-y: auto; }
-        .selections.empty { color: #86868b; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+        /* ===== Step 2 — Injector-style two-pane layout ===== */
+        #step2 { background: #f5f7fa; margin: -2.5rem; padding: 2.5rem; border-radius: 16px; }
+        #step2 .step2-header { text-align: center; margin-bottom: 24px; }
+        #step2 .step2-header h1 { color: #333; }
+        #step2 .step2-header .subtitle { margin: 0; }
+
+        .panes-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start; }
+        .pane { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 30px; display: flex; flex-direction: column; }
+        .pane h2 { color: #333; font-size: 20px; margin: 0 0 20px 0; padding-bottom: 15px; border-bottom: 2px solid #667eea; }
+
+        /* Each labelled sub-container inside a pane */
+        .field-block { position: relative; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+        .field-block:last-child { margin-bottom: 0; }
+        .field-block > label { display: block; font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 10px; }
+        .field-block input { width: 100%; margin-bottom: 12px; }
+
+        .search-results, .top-4-items, .selections { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px; background: #fafafa; }
+        .search-results { flex-direction: column; flex-wrap: nowrap; min-height: 60px; max-height: 220px; overflow-y: auto; }
+        .top-4-items { min-height: 60px; }
+        .selections { min-height: 200px; max-height: 460px; overflow-y: auto; }
+        .empty { margin: auto; text-align: center; color: #999; font-size: 0.9rem; }
+
+        /* Indigo accents to match the Injector */
+        #step2 input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        #step2 .action-btn { background: #667eea; }
+        #step2 .action-btn:hover { background: #5568d3; }
+        #step2 .pill:hover { border-color: #667eea; background-color: #f0f0ff; }
+        #step2 .pill.selected { background-color: #667eea; border-color: #667eea; }
+        #step2 .pill.selected:hover { background-color: #5568d3; }
+
+        /* Empty-submit warning: flash the two source containers semi-transparent orange */
+        @keyframes step2FlashBorder {
+            0%, 100% { border-color: #e0e0e0; }
+            30%, 60% { border-color: #ff9500; }
+        }
+        @keyframes step2FlashOverlay {
+            0%, 100% { opacity: 0; }
+            30%, 60% { opacity: 1; }
+        }
+        .field-block.flash-empty { animation: step2FlashBorder 0.9s ease-in-out; }
+        .field-block.flash-empty::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            background: rgba(255,149,0,0.30);
+            pointer-events: none;
+            opacity: 0; /* invisible except during the flash animation */
+            animation: step2FlashOverlay 0.9s ease-in-out;
+        }
         
         .pill { padding: 10px 12px; border-radius: 20px; border: 1px solid #d2d2d7; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; user-select: none; background: white; color: #1d1d1f; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; flex-shrink: 1; }
         .pill:hover { border-color: #0071e3; background-color: #f0f6ff; }
@@ -83,41 +114,45 @@
         </div>
 
         <div id="step2" class="step-panel">
-            <h1>Company Initiatives or Pain Points</h1>
-            <p class="subtitle">Select initiatives that matter to you:</p>
-            
-            <div class="intentions-layout">
-                <!-- Left Column: Search + Top 4 -->
-                <div class="left-column">
-                    <!-- Search Container -->
-                    <div class="search-container">
-                        <div class="search-input-wrapper">
-                            <input type="text" id="searchIntentions" placeholder="Search initiatives..." onkeyup="handleSearch()">
-                        </div>
-                        <div id="searchResults" class="search-results empty">No results</div>
+            <div class="step2-header">
+                <h1>Company Initiatives or Pain Points</h1>
+                <p class="subtitle">Select initiatives that matter to you:</p>
+            </div>
+
+            <div class="panes-container">
+                <!-- PANE 1: Discover initiatives (search + top 4) -->
+                <div class="pane">
+                    <h2>Find Initiatives</h2>
+
+                    <!-- Container 1: Search -->
+                    <div class="field-block" id="searchBlock">
+                        <label>Search</label>
+                        <input type="text" id="searchIntentions" placeholder="Search initiatives..." onkeyup="handleSearch()">
+                        <div id="searchResults" class="search-results"><div class="empty">No results</div></div>
                     </div>
-                    
-                    <!-- Top 4 Container -->
-                    <div class="top-4-container">
-                        <div class="top-4-label">Top Initiatives for Your Pillar & Industry</div>
+
+                    <!-- Container 2: Top initiatives -->
+                    <div class="field-block" id="topBlock">
+                        <label>Top Initiatives for Your Pillar &amp; Industry</label>
                         <div id="topIntentionsContainer" class="top-4-items"></div>
                     </div>
                 </div>
-                
-                <!-- Right Column: Selections -->
-                <div class="selections-container">
-                    <div class="selections-label">Selected</div>
-                    <div id="selectedContainer" class="selections empty">No selections</div>
+
+                <!-- PANE 2: Selected -->
+                <div class="pane">
+                    <h2>Your Selections</h2>
+                    <div id="selectedContainer" class="selections"><div class="empty">No selections</div></div>
                 </div>
             </div>
-            
-            <button class="action-btn" onclick="submitPainPointsForm()" style="margin-top: 2rem;">Submit & View Recommendations</button>
+
+            <button class="action-btn" onclick="submitPainPointsForm()" style="margin-top: 2rem;">Submit &amp; View Recommendations</button>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
     <script>
         let currentRecord = null;
+        let generatedEmail = null; // the auto-generated email from "Randomize", so we can reject it at the email step
         let selectedIntentionIds = new Set();
         let allIntentions = [];
         let topIntentions = [];
@@ -129,7 +164,11 @@
             const [pRes, iRes] = await Promise.all([fetch('/api/pillars'), fetch('/api/industries')]);
             const pData = await pRes.json();
             const iData = await iRes.json();
-            pData.pillars.forEach(p => document.getElementById('pillarSelect').innerHTML += `<option value="${p.id}">${p.name}</option>`);
+            pData.pillars.forEach(p => {
+                // Pillars with no intentions are unselectable and shown in a lighter shade
+                const attrs = p.hasIntentions ? '' : ' disabled style="color:#c7c7cc;"';
+                document.getElementById('pillarSelect').innerHTML += `<option value="${p.id}"${attrs}>${p.name}</option>`;
+            });
             iData.industries.forEach(i => document.getElementById('industrySelect').innerHTML += `<option value="${i.id}">${i.name}</option>`);
         };
 
@@ -137,6 +176,7 @@
             document.getElementById('popBtn').innerText = "Randomize Again";
             const res = await fetch('/api/generate-identity');
             currentRecord = await res.json();
+            generatedEmail = currentRecord.email; // remember it so we can block sending to this fake address
             document.getElementById('firstName').value = currentRecord.firstName;
             document.getElementById('lastName').value = currentRecord.lastName;
             document.getElementById('email').value = currentRecord.email;
@@ -287,9 +327,20 @@
             selectedContainer.innerHTML = html;
         }
 
+        function flashEmptyInitiatives() {
+            // Flash the two source containers (search + top initiatives) semi-transparent orange
+            ['searchBlock', 'topBlock'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.classList.remove('flash-empty');
+                void el.offsetWidth; // restart the animation if it's mid-flash
+                el.classList.add('flash-empty');
+            });
+        }
+
         async function submitPainPointsForm() {
             if (selectedIntentionIds.size === 0) {
-                alert('Please select at least one initiative.');
+                flashEmptyInitiatives();
                 return;
             }
 
@@ -373,6 +424,16 @@
                 if (!email) {
                     statusEl.style.color = '#d70015';
                     statusEl.textContent = 'Please enter an email address.';
+                    return;
+                }
+                // Block the auto-generated test email: it points at a fake domain and would just
+                // bounce, wasting a Resend send. Show a native validation tooltip on the box
+                // (same experience as a required field in step 1) instead of an alert popup.
+                if (generatedEmail && email.toLowerCase() === generatedEmail.toLowerCase()) {
+                    const emailInput = document.getElementById('recipientEmail');
+                    emailInput.setCustomValidity('Use a real email to see this feature in action!');
+                    emailInput.reportValidity();
+                    emailInput.addEventListener('input', () => emailInput.setCustomValidity(''), { once: true });
                     return;
                 }
                 btn.disabled = true;
