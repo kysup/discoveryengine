@@ -65,8 +65,9 @@ export function Step1({ onComplete, showHints = false }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const pillarName = pillars.find((p) => String(p.id) === pillarId)?.name ?? ""
     onComplete(
-      { firstName, lastName, email, companyName, companySize, industryId, pillarId },
+      { firstName, lastName, email, companyName, companySize, industryId, pillarId, pillarName },
       generatedEmail,
     )
   }

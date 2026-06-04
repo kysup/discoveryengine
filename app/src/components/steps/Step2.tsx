@@ -140,7 +140,7 @@ export function Step2({ lead, onComplete }: Props) {
 
             <div ref={topBlockRef} className="relative rounded-lg border border-border p-4">
               <label className="mb-2 block text-sm font-medium">
-                Top Initiatives for Your Pillar &amp; Industry
+                Top Initiatives for {lead.pillarName || "your department"}
               </label>
               <div className="flex min-h-[60px] flex-wrap items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
                 {visibleTop.length === 0 ? (
