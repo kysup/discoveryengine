@@ -65,8 +65,9 @@ export function Step1({ onComplete, showHints = false }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const pillarName = pillars.find((p) => String(p.id) === pillarId)?.name ?? ""
     onComplete(
-      { firstName, lastName, email, companyName, companySize, industryId, pillarId },
+      { firstName, lastName, email, companyName, companySize, industryId, pillarId, pillarName },
       generatedEmail,
     )
   }
@@ -148,13 +149,13 @@ export function Step1({ onComplete, showHints = false }: Props) {
           <Hint
             active={showHints}
             side="right"
-            text="Departments with no initiatives are greyed out and can't be selected."
+            text="Fields used to get tailored recommendations "
           >
             <div className="grid gap-2">
-              <Label>Department</Label>
-              <Select name="department" value={pillarId} onValueChange={setPillarId} required>
+              <Label>Category</Label>
+              <Select name="category" value={pillarId} onValueChange={setPillarId} required>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="-- Select Department --" />
+                  <SelectValue placeholder="-- Select Category --" />
                 </SelectTrigger>
                 <SelectContent>
                   {pillars.map((p) => (

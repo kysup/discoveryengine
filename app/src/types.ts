@@ -15,6 +15,7 @@ export type Lead = {
   companySize: string
   industryId: string
   pillarId: string
+  pillarName: string
 }
 
 export type Intention = {
