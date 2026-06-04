@@ -142,7 +142,7 @@ export function Step2({ lead, onComplete }: Props) {
               <label className="mb-2 block text-sm font-medium">
                 Top Initiatives for Your Pillar &amp; Industry
               </label>
-              <div className="flex min-h-[60px] flex-wrap gap-2 rounded-md border border-border bg-muted/40 p-3">
+              <div className="flex min-h-[60px] flex-wrap items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
                 {visibleTop.length === 0 ? (
                   <p className="m-auto py-2 text-sm text-muted-foreground">No initiatives</p>
                 ) : (
@@ -168,7 +168,7 @@ export function Step2({ lead, onComplete }: Props) {
             <CardTitle className="text-lg">Your Selections</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex min-h-[200px] flex-wrap gap-2 rounded-md border border-border bg-muted/40 p-3">
+            <div className="flex min-h-[200px] flex-wrap items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
               {selected.length === 0 ? (
                 <p className="m-auto text-sm text-muted-foreground">No selections</p>
               ) : (

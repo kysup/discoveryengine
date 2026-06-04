@@ -17,15 +17,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { generateIdentity, getIndustries, getPillars } from "@/lib/api"
+import { Hint } from "@/components/Hint"
 import type { Industry, Lead, Pillar } from "@/types"
 
 const SIZES = ["Small", "Medium", "Enterprise"]
 
 type Props = {
   onComplete: (lead: Lead, generatedEmail: string | null) => void
+  showHints?: boolean
 }
 
-export function Step1({ onComplete }: Props) {
+export function Step1({ onComplete, showHints = false }: Props) {
   const [industries, setIndustries] = useState<Industry[]>([])
   const [pillars, setPillars] = useState<Pillar[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -70,20 +72,26 @@ export function Step1({ onComplete }: Props) {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md animate-pixelate-in">
       <CardHeader>
         <CardTitle className="text-xl">Software Discovery Engine</CardTitle>
         <CardDescription>Fill out the form to get recommendations.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button
-          type="button"
-          variant="secondary"
-          className="mb-6 h-9 w-full"
-          onClick={randomize}
+        <Hint
+          active={showHints}
+          side="right"
+          text="Auto-fills the form with realistic sample data so you can try it instantly."
         >
-          Randomize Form
-        </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mb-6 h-9 w-full"
+            onClick={randomize}
+          >
+            Randomize Form
+          </Button>
+        </Hint>
 
         {loadError && <p className="mb-4 text-sm text-destructive">{loadError}</p>}
 
@@ -137,21 +145,27 @@ export function Step1({ onComplete }: Props) {
             </Select>
           </div>
 
-          <div className="grid gap-2">
-            <Label>Department</Label>
-            <Select name="department" value={pillarId} onValueChange={setPillarId} required>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="-- Select Department --" />
-              </SelectTrigger>
-              <SelectContent>
-                {pillars.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)} disabled={!p.hasIntentions}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Hint
+            active={showHints}
+            side="right"
+            text="Departments with no initiatives are greyed out and can't be selected."
+          >
+            <div className="grid gap-2">
+              <Label>Department</Label>
+              <Select name="department" value={pillarId} onValueChange={setPillarId} required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="-- Select Department --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pillars.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)} disabled={!p.hasIntentions}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Hint>
 
           <Button type="submit" className="mt-2 h-9 w-full">
             Submit &amp; Continue
