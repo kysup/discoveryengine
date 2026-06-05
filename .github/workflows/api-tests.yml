@@ -1,0 +1,61 @@
+name: API Tests (deployed)
+
+# Runs the Postman "Discovery Engine — Tests" collection via the Postman CLI (so the
+# run shows up in Postman's run history) against the DEPLOYED Vercel apps after a push
+# to preview or main. Tests hit the production DB but are self-cleaning, and the job
+# aborts BEFORE creating data if the deploys aren't healthy or the token is rejected.
+on:
+  push:
+    branches: [preview, main]
+  workflow_dispatch:
+
+concurrency:
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    # URLs + token come from the matching GitHub Environment (create "preview" + "production").
+    environment: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+    env:
+      USERAPP_URL: ${{ vars.USERAPP_URL }}
+      INJECTOR_URL: ${{ vars.INJECTOR_URL }}
+      TEST_API_TOKEN: ${{ secrets.TEST_API_TOKEN }}
+    steps:
+      - name: Verify Vercel <-> DB, then verify delete token (before creating data)
+        run: |
+          if [ -z "$USERAPP_URL" ] || [ -z "$INJECTOR_URL" ] || [ -z "$TEST_API_TOKEN" ]; then
+            echo "::error::Set USERAPP_URL + INJECTOR_URL (variables) and TEST_API_TOKEN (secret) on this GitHub Environment."
+            exit 1
+          fi
+          echo "Waiting for deployments to be healthy..."
+          for i in $(seq 1 40); do
+            APP=$(curl -s -o /dev/null -w '%{http_code}' "$USERAPP_URL/api/health" || echo 000)
+            INJ=$(curl -s -o /dev/null -w '%{http_code}' "$INJECTOR_URL/api/industries" || echo 000)
+            if [ "$APP" = "200" ] && [ "$INJ" = "200" ]; then
+              echo "Vercel <-> DB OK (app=$APP, injector=$INJ)"; break
+            fi
+            if [ "$i" = "40" ]; then echo "::error::Deploys not healthy (app=$APP injector=$INJ)"; exit 1; fi
+            echo "  waiting ($i/40): app=$APP injector=$INJ"; sleep 6
+          done
+          # Confirm the delete token works BEFORE any record is created (deletes nothing).
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$INJECTOR_URL/api/products/0" -H "x-test-token: $TEST_API_TOKEN")
+          if [ "$CODE" = "403" ]; then
+            echo "::error::Deployed API rejected TEST_API_TOKEN (403). Add it to the Vercel project env. Aborting before creating test data."
+            exit 1
+          fi
+          echo "Delete token accepted (HTTP $CODE)."
+
+      - name: Install Postman CLI
+        run: curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+
+      - name: Run Postman test collection (reports to Postman run history)
+        run: |
+          postman login --with-api-key "${{ secrets.POSTMAN_API_KEY }}"
+          postman collection run "54638090-47467b60-aa81-4a30-9b4f-f4e687beb2f0" \
+            --env-var "injectorUrl=$INJECTOR_URL" \
+            --env-var "userAppUrl=$USERAPP_URL" \
+            --env-var "testToken=$TEST_API_TOKEN" \
+            --env-var "industryId=1" \
+            --env-var "pillarId=1"

@@ -1,0 +1,11 @@
+{
+  "name": "discoveryengine-tooling",
+  "private": true,
+  "description": "Repo-level tooling: on-demand local API tests (Newman) + git hooks.",
+  "scripts": {
+    "test:api": "node scripts/run-api-tests.mjs"
+  },
+  "devDependencies": {
+    "newman": "^6.2.2"
+  }
+}
