@@ -1,0 +1,17 @@
+#!/bin/sh
+# Fast pre-push gate — blocks the push if anything fails, so broken code never
+# reaches GitHub. Pure checks only (no servers / DB): lint, typecheck, build.
+# Run the full API tests separately with:  npm run test:api
+set -e
+
+echo "▶ pre-push: app — lint, typecheck, build"
+npm --prefix app run lint
+npm --prefix app run typecheck
+npm --prefix app run build
+
+echo "▶ pre-push: injector — lint, typecheck, build"
+npm --prefix injector run lint
+npm --prefix injector run typecheck
+npm --prefix injector run build
+
+echo "✓ pre-push checks passed"

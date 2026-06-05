@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "Discovery Engine — Tests",
+    "_postman_id": "d15c0e2e-7e57-4a00-9000-discoveryenginetests",
+    "description": "Self-cleaning test suite, safe to run as a WHOLE collection (Postman CLI / Collection Runner). Order: (1) read + connectivity smoke tests for both apps, (2) preflight token check, (3) injector create/link/get/teardown + sequence-reuse, (4) user-app lead create/get/delete. Every record created is deleted. Pass urls + testToken via --env-var in CI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "injectorUrl", "value": "http://localhost:8081" },
+    { "key": "userAppUrl", "value": "http://localhost:8080" },
+    { "key": "testToken", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "intentionId", "value": "" },
+    { "key": "leadId", "value": "" },
+    { "key": "industryId", "value": "1" },
+    { "key": "pillarId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Reads & Connectivity",
+      "item": [
+        {
+          "name": "Injector — Health",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{injectorUrl}}/health", "host": ["{{injectorUrl}}"], "path": ["health"] } }
+        },
+        {
+          "name": "Injector — Get Industries",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns industries (DB reachable)', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{injectorUrl}}/api/industries", "host": ["{{injectorUrl}}"], "path": ["api", "industries"] } }
+        },
+        {
+          "name": "Injector — Get Pillars",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns pillars', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{injectorUrl}}/api/pillars", "host": ["{{injectorUrl}}"], "path": ["api", "pillars"] } }
+        },
+        {
+          "name": "App — Health (checks DB)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK (Vercel <-> DB)', () => pm.response.to.have.status(200));"] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/health", "host": ["{{userAppUrl}}"], "path": ["api", "health"] } }
+        },
+        {
+          "name": "App — Generate Identity",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns a generated identity', () => { const j = pm.response.json(); pm.expect(j).to.have.property('email'); pm.expect(j).to.have.property('firstName'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/generate-identity", "host": ["{{userAppUrl}}"], "path": ["api", "generate-identity"] } }
+        },
+        {
+          "name": "App — Get Pillars",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns pillars', () => pm.expect(pm.response.json().pillars.length).to.be.above(0));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/pillars", "host": ["{{userAppUrl}}"], "path": ["api", "pillars"] } }
+        },
+        {
+          "name": "App — Get Industries",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns industries', () => pm.expect(pm.response.json().industries.length).to.be.above(0));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/industries", "host": ["{{userAppUrl}}"], "path": ["api", "industries"] } }
+        },
+        {
+          "name": "App — Intentions (by pillar)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns an intentions array', () => pm.expect(pm.response.json().intentions).to.be.an('array'));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/intentions?pillarId={{pillarId}}&industryId={{industryId}}", "host": ["{{userAppUrl}}"], "path": ["api", "intentions"], "query": [{ "key": "pillarId", "value": "{{pillarId}}" }, { "key": "industryId", "value": "{{industryId}}" }] } }
+        },
+        {
+          "name": "App — Intentions With Scores",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns topIntentions + allIntentions arrays', () => { const j = pm.response.json(); pm.expect(j.topIntentions).to.be.an('array'); pm.expect(j.allIntentions).to.be.an('array'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/intentions-with-scores?pillarId={{pillarId}}&industryId={{industryId}}", "host": ["{{userAppUrl}}"], "path": ["api", "intentions-with-scores"], "query": [{ "key": "pillarId", "value": "{{pillarId}}" }, { "key": "industryId", "value": "{{industryId}}" }] } }
+        }
+      ]
+    },
+    {
+      "name": "2. Injector Lifecycle (self-cleaning)",
+      "item": [
+        {
+          "name": "0. Preflight — verify delete token (aborts before creating anything)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const token = pm.variables.get('testToken');",
+            "pm.test('testToken is set', function () { pm.expect(Boolean(token), 'Set testToken in your environment').to.be.true; });",
+            "pm.test('delete token accepted (not 403)', function () { pm.expect(pm.response.code, 'Server rejected the token — check it matches TEST_API_TOKEN').to.not.eql(403); });",
+            "if (!token || pm.response.code === 403) {",
+            "  console.error('Preflight failed: aborting before any records are created.');",
+            "  postman.setNextRequest(null);",
+            "}"
+          ] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "x-test-token", "value": "{{testToken}}" }], "url": { "raw": "{{injectorUrl}}/api/products/0", "host": ["{{injectorUrl}}"], "path": ["api", "products", "0"] } }
+        },
+        {
+          "name": "1. Create Product",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('productId', pm.response.json().data.id);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"company_name\": \"Lifecycle Co\",\n  \"product_name\": \"Lifecycle Product\"\n}" }, "url": { "raw": "{{injectorUrl}}/api/products", "host": ["{{injectorUrl}}"], "path": ["api", "products"] } }
+        },
+        {
+          "name": "2. Create Intention",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('intentionId', pm.response.json().data.id);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"label\": \"Lifecycle intention\",\n  \"type\": \"initiative\"\n}" }, "url": { "raw": "{{injectorUrl}}/api/intentions", "host": ["{{injectorUrl}}"], "path": ["api", "intentions"] } }
+        },
+        {
+          "name": "3. Link Product <-> Intention",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{productId}},\n  \"intention_id\": {{intentionId}},\n  \"score\": 7\n}" }, "url": { "raw": "{{injectorUrl}}/api/product-intentions", "host": ["{{injectorUrl}}"], "path": ["api", "product-intentions"] } }
+        },
+        {
+          "name": "4. Get link",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('link exists', () => pm.expect(pm.response.json().data.length).to.eql(1));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{injectorUrl}}/api/product-intentions?product_id={{productId}}&intention_id={{intentionId}}", "host": ["{{injectorUrl}}"], "path": ["api", "product-intentions"], "query": [{ "key": "product_id", "value": "{{productId}}" }, { "key": "intention_id", "value": "{{intentionId}}" }] } }
+        },
+        {
+          "name": "5. Get Product",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('matches productId', () => pm.expect(String(pm.response.json().data.id)).to.eql(String(pm.collectionVariables.get('productId'))));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{injectorUrl}}/api/products/{{productId}}", "host": ["{{injectorUrl}}"], "path": ["api", "products", "{{productId}}"] } }
+        },
+        {
+          "name": "6. Delete link",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-test-token", "value": "{{testToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{productId}},\n  \"intention_id\": {{intentionId}}\n}" }, "url": { "raw": "{{injectorUrl}}/api/product-intentions", "host": ["{{injectorUrl}}"], "path": ["api", "product-intentions"] } }
+        },
+        {
+          "name": "7. Delete Intention",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('deleted one', () => pm.expect(pm.response.json().deleted.length).to.eql(1));"
+          ] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "x-test-token", "value": "{{testToken}}" }], "url": { "raw": "{{injectorUrl}}/api/intentions/{{intentionId}}", "host": ["{{injectorUrl}}"], "path": ["api", "intentions", "{{intentionId}}"] } }
+        },
+        {
+          "name": "8. Delete Product",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('deleted one', () => pm.expect(pm.response.json().deleted.length).to.eql(1));"
+          ] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "x-test-token", "value": "{{testToken}}" }], "url": { "raw": "{{injectorUrl}}/api/products/{{productId}}", "host": ["{{injectorUrl}}"], "path": ["api", "products", "{{productId}}"] } }
+        },
+        {
+          "name": "9. Verify sequence reuse (recreate + cleanup)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('reused the freed product id (needs reset_id_sequence installed)', () => pm.expect(String(pm.response.json().data.id)).to.eql(String(pm.collectionVariables.get('productId'))));",
+            "const id = pm.response.json().data.id;",
+            "pm.sendRequest({ url: pm.variables.replaceIn('{{injectorUrl}}/api/products/') + id, method: 'DELETE', header: { 'x-test-token': pm.variables.get('testToken') } }, () => {});"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"company_name\": \"Lifecycle Co\",\n  \"product_name\": \"Lifecycle Product\"\n}" }, "url": { "raw": "{{injectorUrl}}/api/products", "host": ["{{injectorUrl}}"], "path": ["api", "products"] } }
+        }
+      ]
+    },
+    {
+      "name": "3. User App Lead (self-cleaning)",
+      "item": [
+        {
+          "name": "Submit Lead",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('leadId', pm.response.json().leadId);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Pat\",\n  \"lastName\": \"Tester\",\n  \"email\": \"pat@example.com\",\n  \"companyName\": \"Test Co\",\n  \"companySize\": \"Medium\",\n  \"industryId\": {{industryId}},\n  \"pillarId\": {{pillarId}},\n  \"intentionIds\": []\n}" }, "url": { "raw": "{{userAppUrl}}/api/submit-lead", "host": ["{{userAppUrl}}"], "path": ["api", "submit-lead"] } }
+        },
+        {
+          "name": "Get Lead",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('matches leadId', () => pm.expect(String(pm.response.json().lead.id)).to.eql(String(pm.collectionVariables.get('leadId'))));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{userAppUrl}}/api/leads/{{leadId}}", "host": ["{{userAppUrl}}"], "path": ["api", "leads", "{{leadId}}"] } }
+        },
+        {
+          "name": "Delete Lead",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "x-test-token", "value": "{{testToken}}" }], "url": { "raw": "{{userAppUrl}}/api/leads/{{leadId}}", "host": ["{{userAppUrl}}"], "path": ["api", "leads", "{{leadId}}"] } }
+        }
+      ]
+    }
+  ]
+}

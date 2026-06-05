@@ -13,6 +13,25 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// ============================================================================
+// Test-harness helpers (shared by the DELETE routes below)
+// ============================================================================
+// Guard destructive routes with a shared secret (x-test-token === TEST_API_TOKEN).
+function requireTestToken(req, res, next) {
+    const expected = process.env.TEST_API_TOKEN;
+    if (!expected || req.get('x-test-token') !== expected) {
+        return res.status(403).json({ error: 'Forbidden: valid x-test-token header required.' });
+    }
+    next();
+}
+
+// Repoint a table's identity sequence to MAX(id) — see db/reset_id_sequence.sql.
+// Non-fatal: logs and continues if the helper function isn't installed yet.
+async function resetSequence(table) {
+    const { error } = await supabase.rpc('reset_id_sequence', { p_table: table });
+    if (error) console.warn(`reset_id_sequence(${table}) failed: ${error.message}`);
+}
+
 // 1. HEALTH CHECK: Handles both Vercel serverless formats
 app.get(['/api/health', '/health'], async (req, res) => {
     try {
@@ -551,6 +570,82 @@ app.post(['/api/email-recommendations', '/email-recommendations'], async (req, r
         if (error) throw new Error(error.message || 'Resend failed to send the email.');
 
         return res.json({ success: true, id: data?.id });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================================
+// GET one / DELETE — leads (identity id; cascades lead_answers; sequence reset)
+// ============================================================================
+app.get(['/api/leads/:id', '/leads/:id'], async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', req.params.id)
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Lead not found' });
+        return res.json({ lead: data });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete(['/api/leads/:id', '/leads/:id'], requireTestToken, async (req, res) => {
+    try {
+        const leadId = parseInt(req.params.id);
+        // Remove dependent lead_answers first (FK), then the lead itself.
+        const { error: answersError } = await supabase
+            .from('lead_answers')
+            .delete()
+            .eq('lead_id', leadId);
+        if (answersError) throw answersError;
+
+        const { data, error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', leadId)
+            .select();
+        if (error) throw error;
+
+        await resetSequence('leads');
+        await resetSequence('lead_answers');
+
+        return res.json({ success: true, deleted: data });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================================
+// GET one / DELETE — intention_scores (keyed by intention_id; no sequence)
+// ============================================================================
+app.get(['/api/intention-scores/:intentionId', '/intention-scores/:intentionId'], async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('intention_scores')
+            .select('*')
+            .eq('intention_id', req.params.intentionId)
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Intention score not found' });
+        return res.json({ intentionScore: data });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete(['/api/intention-scores/:intentionId', '/intention-scores/:intentionId'], requireTestToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('intention_scores')
+            .delete()
+            .eq('intention_id', req.params.intentionId)
+            .select();
+        if (error) throw error;
+        return res.json({ success: true, deleted: data });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
