@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
 import { ProductCard } from "@/components/steps/ProductCard"
 import { emailRecommendations } from "@/lib/api"
 import type { Lead, Recommendation } from "@/types"
@@ -50,40 +51,44 @@ export function Step3({ lead, generatedEmail, recommendations }: Props) {
   }
 
   return (
-    <div className="w-full max-w-3xl">
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <h1 className="text-2xl font-semibold">Recommended Software</h1>
+    <div className="w-full max-w-3xl animate-pixelate-in">
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+            <h1 className="text-2xl font-semibold">Recommended Software</h1>
 
-        <div className="flex w-full max-w-xs flex-col gap-2">
-          <p className="text-right text-sm font-medium">Email these suggestions to yourself</p>
-          <div className="flex gap-2">
-            <Input
-              ref={emailRef}
-              type="email"
-              value={email}
-              placeholder="you@company.com"
-              onChange={(e) => {
-                setEmail(e.target.value)
-                emailRef.current?.setCustomValidity("")
-              }}
-            />
-            <Button onClick={send} disabled={sending}>
-              {sending ? "Sending…" : "Send"}
-            </Button>
+            <div className="flex w-full max-w-xs flex-col gap-2">
+              <p className="text-right text-sm font-medium">Email these suggestions to yourself</p>
+              <div className="flex gap-2">
+                <Input
+                  ref={emailRef}
+                  type="email"
+                  value={email}
+                  placeholder="you@company.com"
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    emailRef.current?.setCustomValidity("")
+                  }}
+                />
+                <Button onClick={send} disabled={sending}>
+                  {sending ? "Sending…" : "Send"}
+                </Button>
+              </div>
+              {status && (
+                <span
+                  className={
+                    status.ok
+                      ? "text-right text-sm text-emerald-600"
+                      : "text-right text-sm text-destructive"
+                  }
+                >
+                  {status.msg}
+                </span>
+              )}
+            </div>
           </div>
-          {status && (
-            <span
-              className={
-                status.ok
-                  ? "text-right text-sm text-emerald-600"
-                  : "text-right text-sm text-destructive"
-              }
-            >
-              {status.msg}
-            </span>
-          )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {recommendations.length === 0 ? (
         <p className="text-muted-foreground">

@@ -653,7 +653,7 @@ app.delete(['/api/intention-scores/:intentionId', '/intention-scores/:intentionI
 
 // Serve the index.html for the root path for testing
 app.get('/', (req, res) => {
-    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+    res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
 });
 
 // Only start a local server if we aren't running in production on Vercel

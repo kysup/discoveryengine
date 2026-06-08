@@ -97,7 +97,7 @@ export function Step2({ lead, onComplete }: Props) {
   }
 
   return (
-    <div className="w-full max-w-5xl">
+    <div className="w-full max-w-5xl animate-pixelate-in">
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-semibold">Company Initiatives or Pain Points</h1>
         <p className="text-muted-foreground">Select the initiatives that matter to you.</p>
