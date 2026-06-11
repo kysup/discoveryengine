@@ -43,3 +43,26 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  sync-postman:
+    name: Sync Postman collection
+    runs-on: ubuntu-latest
+    needs: verify
+    # Only sync on pushes to main/preview — not on PRs
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Push collection to Postman API
+        run: |
+          STATUS=$(curl -s -o /tmp/postman_response.json -w '%{http_code}' \
+            -X PUT "https://api.getpostman.com/collections/47467b60-aa81-4a30-9b4f-f4e687beb2f0" \
+            -H "X-Api-Key: ${{ secrets.POSTMAN_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq '{collection: .}' postman/discovery-engine-tests.postman_collection.json)")
+          echo "Postman API response ($STATUS): $(cat /tmp/postman_response.json)"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Postman collection sync failed (HTTP $STATUS)"
+            exit 1
+          fi

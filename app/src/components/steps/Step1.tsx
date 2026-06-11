@@ -40,6 +40,13 @@ export function Step1({ onComplete, showHints = false }: Props) {
   const [industryId, setIndustryId] = useState("")
   const [pillarId, setPillarId] = useState("")
   const [generatedEmail, setGeneratedEmail] = useState<string | null>(null)
+  const [firstNameError, setFirstNameError] = useState(false)
+  const [lastNameError, setLastNameError] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [companyNameError, setCompanyNameError] = useState(false)
+  const [sizeError, setSizeError] = useState(false)
+  const [industryError, setIndustryError] = useState(false)
+  const [pillarError, setPillarError] = useState(false)
 
   useEffect(() => {
     Promise.all([getIndustries(), getPillars()])
@@ -65,6 +72,22 @@ export function Step1({ onComplete, showHints = false }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const fne = !firstName.trim()
+    const lne = !lastName.trim()
+    const emailVal = email.trim()
+    const emailInvalid = !emailVal ? "Please enter an email address." : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal) ? "Please enter a valid email address." : null
+    const cne = !companyName.trim()
+    const se = !companySize
+    const ie = !industryId
+    const pe = !pillarId
+    setFirstNameError(fne)
+    setLastNameError(lne)
+    setEmailError(emailInvalid)
+    setCompanyNameError(cne)
+    setSizeError(se)
+    setIndustryError(ie)
+    setPillarError(pe)
+    if (fne || lne || emailInvalid || cne || se || ie || pe) return
     const pillarName = pillars.find((p) => String(p.id) === pillarId)?.name ?? ""
     onComplete(
       { firstName, lastName, email, companyName, companySize, industryId, pillarId, pillarName },
@@ -99,25 +122,50 @@ export function Step1({ onComplete, showHints = false }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+            <Input
+              id="firstName"
+              value={firstName}
+              className={firstNameError ? "border-destructive" : ""}
+              onChange={(e) => { setFirstName(e.target.value); setFirstNameError(false) }}
+            />
+            {firstNameError && <p className="text-xs text-destructive">Please enter a first name.</p>}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="lastName">Last Name</Label>
-            <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            <Input
+              id="lastName"
+              value={lastName}
+              className={lastNameError ? "border-destructive" : ""}
+              onChange={(e) => { setLastName(e.target.value); setLastNameError(false) }}
+            />
+            {lastNameError && <p className="text-xs text-destructive">Please enter a last name.</p>}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              id="email"
+              type="text"
+              value={email}
+              className={emailError ? "border-destructive" : ""}
+              onChange={(e) => { setEmail(e.target.value); setEmailError(null) }}
+            />
+            {emailError && <p className="text-xs text-destructive">{emailError}</p>}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="companyName">Company</Label>
-            <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+            <Input
+              id="companyName"
+              value={companyName}
+              className={companyNameError ? "border-destructive" : ""}
+              onChange={(e) => { setCompanyName(e.target.value); setCompanyNameError(false) }}
+            />
+            {companyNameError && <p className="text-xs text-destructive">Please enter a company name.</p>}
           </div>
 
           <div className="grid gap-2">
             <Label>Size</Label>
-            <Select name="companySize" value={companySize} onValueChange={setCompanySize} required>
-              <SelectTrigger className="w-full">
+            <Select name="companySize" value={companySize} onValueChange={(v) => { setCompanySize(v); setSizeError(false) }}>
+              <SelectTrigger className={`w-full${sizeError ? " border-destructive" : ""}`}>
                 <SelectValue placeholder="-- Select Size --" />
               </SelectTrigger>
               <SelectContent>
@@ -128,12 +176,13 @@ export function Step1({ onComplete, showHints = false }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            {sizeError && <p className="text-xs text-destructive">Please select a company size.</p>}
           </div>
 
           <div className="grid gap-2">
             <Label>Industry</Label>
-            <Select name="industry" value={industryId} onValueChange={setIndustryId} required>
-              <SelectTrigger className="w-full">
+            <Select name="industry" value={industryId} onValueChange={(v) => { setIndustryId(v); setIndustryError(false) }}>
+              <SelectTrigger className={`w-full${industryError ? " border-destructive" : ""}`}>
                 <SelectValue placeholder="-- Select Industry --" />
               </SelectTrigger>
               <SelectContent>
@@ -144,6 +193,7 @@ export function Step1({ onComplete, showHints = false }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            {industryError && <p className="text-xs text-destructive">Please select an industry.</p>}
           </div>
 
           <Hint
@@ -153,8 +203,8 @@ export function Step1({ onComplete, showHints = false }: Props) {
           >
             <div className="grid gap-2">
               <Label>Category</Label>
-              <Select name="category" value={pillarId} onValueChange={setPillarId} required>
-                <SelectTrigger className="w-full">
+              <Select name="category" value={pillarId} onValueChange={(v) => { setPillarId(v); setPillarError(false) }}>
+                <SelectTrigger className={`w-full${pillarError ? " border-destructive" : ""}`}>
                   <SelectValue placeholder="-- Select Category --" />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,6 +215,7 @@ export function Step1({ onComplete, showHints = false }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              {pillarError && <p className="text-xs text-destructive">Please select a category.</p>}
             </div>
           </Hint>
 
